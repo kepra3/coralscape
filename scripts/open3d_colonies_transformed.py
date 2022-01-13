@@ -78,7 +78,6 @@ def calculate_euler_angle(opposite, adjacent):
         theta = (np.arctan(opposite / adjacent) - np.pi / 2) * 180 / np.pi
     else:
         print("theta is undefined")
-
     return theta.__float__()
 
 
@@ -86,24 +85,20 @@ def rotate_matrix(pcd, up_vector, short_name):
     # TODO: use euler angles to rotate pcd and annotations
     # up_vector = viscore_md.dd[0:3]
     origin = [0, 0, 0]
-
     # angle xz, phi
     x_diff = origin[0] - up_vector[0]  # opposite - reef perpendicular
     z_diff = origin[2] - up_vector[2]  # adjacent - depth
     theta_xz = calculate_euler_angle(x_diff, z_diff)
     if short_name == "cur_sna_20m_20201202":
         theta_xz = -theta_xz
-
     # angle yz, psi
     y_diff = origin[1] - up_vector[1]  # opposite - reef parallel, y-coord stays the same
     z_diff = origin[2] - up_vector[2]  # adjacent - depth, z-coord is changed
     psi_yz = calculate_euler_angle(y_diff, z_diff)
-
     # needs radians input
     theta_xz_radians = theta_xz / 180 * np.pi
     psi_yz_radians = psi_yz / 180 * np.pi
     R = pcd.get_rotation_matrix_from_xyz((psi_yz_radians, theta_xz_radians, 0))
-
     return R
 
 
@@ -222,18 +217,18 @@ def calc_relative_height_and_overhang(rotated_colonies, rotated_annotations, ran
     return all_relative_heights, all_overhang
 
 
-def calc_overhang(colonies, range, pcd):
+#def calc_overhang(colonies, range, pcd):
     # TODO: subset a cylinder and calculate proportion of z values shaded,
     #  use an expanding cylinder from centre?
-    all_overhang_percentage = {}
-    return all_overhang_percentage
+#    all_overhang_percentage = {}
+#    return all_overhang_percentage
 
 
-def calc_rugosity():
-    # TODO: calculate rugosity!
-    all_rugosity_colony = {}
-    all_rugosity_environment = {}
-    return all_rugosity_colony, all_rugosity_environment
+#def calc_rugosity():
+#    # TODO: calculate rugosity!
+#    all_rugosity_colony = {}
+#    all_rugosity_environment = {}
+#    return all_rugosity_colony, all_rugosity_environment
 
 
 def main(ply_filename, annotations_filename, subsets_filename):
@@ -287,20 +282,20 @@ def main(ply_filename, annotations_filename, subsets_filename):
         # Scale colonies
         # TODO: scale?
         # Store points for the connecting lines
-        connect_points.append(annotations[name])
-        connect_points.append(annotations[name] + v_translation)
+        connect_points.append(rotated_annotations[name])
+        connect_points.append(rotated_annotations[name] + v_translation)
     # Create connected lineset
-    # connecting_lineset = generate_connecting_lineset(connect_points, connect_colors)
+    connecting_lineset = generate_connecting_lineset(connect_points, connect_colors)
     # Join all geometries
-    # all_geoms = list(translated_colonies.values())
-    # all_geoms.append(pcd)
-    # all_geoms.append(connecting_lineset)
+    all_geoms = list(translated_colonies.values())
+    all_geoms.append(pcd_r)
+    all_geoms.append(connecting_lineset)
     # Visualise
-    # o3d.visualization.draw_geometries(all_geoms,
-    #                                  zoom=0.4,
-    #                                  front=viscore_md.cam_eye,
-    #                                  lookat=viscore_md.cam_target,
-    #                                  up=viscore_md.cam_up)
+    o3d.visualization.draw_geometries(all_geoms,
+                                      zoom=0.4,
+                                      front=viscore_md.cam_eye,
+                                      lookat=viscore_md.cam_target,
+                                      up=viscore_md.cam_up)
 
     all_geoms = list(rotated_colonies.values())
     #o3d.visualization.draw_geometries(all_geoms)
@@ -324,17 +319,26 @@ def main(ply_filename, annotations_filename, subsets_filename):
         sample_metadata[key] = [d[key] for d in dicts]
 
     # Scale annotations
-    # TODO: Doesn't make any sense....
-    #transformed_annotations = copy.deepcopy(rotated_annotations)
-    #for name in rotated_annotations:
-    #    for i in range(3):
-    #        transformed_annotations[name][i] = rotated_annotations[name][i] * viscore_md.scale_factor
+    transformed_annotations = copy.deepcopy(rotated_annotations)
+    for name in rotated_annotations:
+        for i in range(3):
+            transformed_annotations[name][i] = rotated_annotations[name][i] * viscore_md.scale_factor
+
+    transformed_annotations_df = pd.DataFrame(transformed_annotations).T
+    transformed_annotations_df.columns = ['x', 'y', 'z']
+    transformed_annotations_df.to_csv('~/git/coralscape_open3d/results/transformed_annotations.csv')
+    print('Saved transformed annotations to file ...')
 
     # Convert to .csv for input to R
     df = pd.DataFrame(sample_metadata).T
     df.columns = ['xy', 'xz', 'yz', 'prop', 'overhang']
     df.to_csv('~/git/coralscape_open3d/results/sample_metadata.csv')
     print('Saved metadata to file ...')
+
+    coordinates = pd.DataFrame(rotated_annotations).T
+    coordinates.columns = ['x', 'y', 'z']
+    coordinates.to_csv('~/git/coralscape_open3d/results/coordinates.csv')
+    print('Saved coordinates to file ...')
 
 
 if __name__ == '__main__':
