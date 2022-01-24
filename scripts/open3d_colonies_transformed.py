@@ -23,8 +23,8 @@ __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/WP20"
-
+PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SB05"
+# check sample 897 in plot
 
 class Viscore_metadata(object):
     """  """
@@ -89,12 +89,14 @@ def rotate_matrix(pcd, up_vector, short_name):
     x_diff = origin[0] - up_vector[0]  # opposite - reef perpendicular
     z_diff = origin[2] - up_vector[2]  # adjacent - depth
     theta_xz = calculate_euler_angle(x_diff, z_diff)
-    if short_name == "cur_sna_20m_20201202":
-        theta_xz = -theta_xz
+    #if short_name == "cur_sna_20m_20201202":
+    #    theta_xz = -theta_xz
+    print('Theta is ...', theta_xz)
     # angle yz, psi
     y_diff = origin[1] - up_vector[1]  # opposite - reef parallel, y-coord stays the same
     z_diff = origin[2] - up_vector[2]  # adjacent - depth, z-coord is changed
     psi_yz = calculate_euler_angle(y_diff, z_diff)
+    print('Psi is ...', psi_yz)
     # needs radians input
     theta_xz_radians = theta_xz / 180 * np.pi
     psi_yz_radians = psi_yz / 180 * np.pi
@@ -112,10 +114,10 @@ def get_ranges(annotations_path, annotations):
     ranges = {}
     for name in annotations:
         # euclidean distance
-        ranges[name] = ((complete_set['{}_left'.format(name)][0] - complete_set['{}_right'.format(name)][0]) ** 2
+        ranges[name] = (((complete_set['{}_left'.format(name)][0] - complete_set['{}_right'.format(name)][0]) ** 2
                         + (complete_set['{}_left'.format(name)][1] - complete_set['{}_right'.format(name)][1]) ** 2
                         + (complete_set['{}_left'.format(name)][2] - complete_set['{}_right'.format(name)][2]) ** 2) \
-                       ** 0.5
+                        ** 0.5) / 2
     return ranges
 
 
@@ -132,7 +134,7 @@ def generate_connecting_lineset(connect_points, connect_colors):
 
 
 def calc_attachment_angles(colonies, axes_order):
-    # TODO: use the PCA method of calculating angles
+    # TODO: select a point every three
     """
     :param colonies: colony point clouds
     :param axes_order: the order of axes for angle calculation, e.g., [0, 1, 2]
@@ -146,8 +148,8 @@ def calc_attachment_angles(colonies, axes_order):
             continue
 
         # Fit a line
-        axes_one = np.array(sample[:, axes_order[0]]).reshape(-1, 1)
-        axes_two = np.array(sample[:, axes_order[1]])
+        axes_one = np.array(sample[::3, axes_order[0]]).reshape(-1, 1)  # sampling every third point
+        axes_two = np.array(sample[::3, axes_order[1]])
         axes_three = np.mean(sample[:, axes_order[2]])
         model = LinearRegression().fit(axes_one, axes_two)
         # r_sq = model.score(axes_one, axes_two)
@@ -225,7 +227,7 @@ def calc_relative_height_and_overhang(rotated_colonies, rotated_annotations, ran
 
 
 #def calc_rugosity():
-#    # TODO: calculate rugosity!
+#    # TODO: calculate rugosity! Look at xz and yz profiles and then calculate the distances between each point over a specific x or y distance.
 #    all_rugosity_colony = {}
 #    all_rugosity_environment = {}
 #    return all_rugosity_colony, all_rugosity_environment
@@ -279,8 +281,6 @@ def main(ply_filename, annotations_filename, subsets_filename):
         v_translation = np.array(viscore_md.dd[0:3]) * V_DISTANCE
         translated_colonies[name] = copy.deepcopy(rotated_colonies[name])
         translated_colonies[name].translate(v_translation)
-        # Scale colonies
-        # TODO: scale?
         # Store points for the connecting lines
         connect_points.append(rotated_annotations[name])
         connect_points.append(rotated_annotations[name] + v_translation)
@@ -291,11 +291,11 @@ def main(ply_filename, annotations_filename, subsets_filename):
     all_geoms.append(pcd_r)
     all_geoms.append(connecting_lineset)
     # Visualise
-    o3d.visualization.draw_geometries(all_geoms,
-                                      zoom=0.4,
-                                      front=viscore_md.cam_eye,
-                                      lookat=viscore_md.cam_target,
-                                      up=viscore_md.cam_up)
+    #o3d.visualization.draw_geometries(all_geoms,
+    #                                  zoom=0.4,
+    #                                  front=viscore_md.cam_eye,
+    #                                  lookat=viscore_md.cam_target,
+    #                                  up=viscore_md.cam_up)
 
     all_geoms = list(rotated_colonies.values())
     #o3d.visualization.draw_geometries(all_geoms)
@@ -313,37 +313,48 @@ def main(ply_filename, annotations_filename, subsets_filename):
                                                                   pcd_r, pcd_tree_r, overhang_value)
 
     # Join dictionaries
-    dicts = [theta_xy, theta_xz, theta_yz, relative_height, overhang]
+    dicts = [theta_xy, theta_xz, theta_yz, relative_height, overhang, ranges]
     sample_metadata = {}
     for key in dicts[0]:
         sample_metadata[key] = [d[key] for d in dicts]
 
     # Scale annotations
-    transformed_annotations = copy.deepcopy(rotated_annotations)
+    scaled_annotations = copy.deepcopy(rotated_annotations)
     for name in rotated_annotations:
         for i in range(3):
-            transformed_annotations[name][i] = rotated_annotations[name][i] * viscore_md.scale_factor
+            scaled_annotations[name][i] = rotated_annotations[name][i] * viscore_md.scale_factor
 
-    transformed_annotations_df = pd.DataFrame(transformed_annotations).T
-    transformed_annotations_df.columns = ['x', 'y', 'z']
-    transformed_annotations_df.to_csv('~/git/coralscape_open3d/results/transformed_annotations.csv')
-    print('Saved transformed annotations to file ...')
+    scaled_annotations_df = pd.DataFrame(scaled_annotations).T
+    scaled_annotations_df.columns = ['x', 'y', 'z']
+    scaled_annotations_df.to_csv('~/git/coralscape_open3d/results/scaled_annotations_{}.csv'.format(ply_filename))
+    print('Saved scaled annotations to file ...')
 
     # Convert to .csv for input to R
     df = pd.DataFrame(sample_metadata).T
-    df.columns = ['xy', 'xz', 'yz', 'prop', 'overhang']
-    df.to_csv('~/git/coralscape_open3d/results/sample_metadata.csv')
+    df.columns = ['xy', 'xz', 'yz', 'prop', 'overhang', 'range']
+    df['range'] = df['range'] * viscore_md.scale_factor  # scaled range
+    df.to_csv('~/git/coralscape_open3d/results/sample_metadata_{}.csv'.format(ply_filename))
     print('Saved metadata to file ...')
 
     coordinates = pd.DataFrame(rotated_annotations).T
     coordinates.columns = ['x', 'y', 'z']
-    coordinates.to_csv('~/git/coralscape_open3d/results/coordinates.csv')
+    coordinates.to_csv('~/git/coralscape_open3d/results/rotated_coordinates_{}.csv'.format(ply_filename))
     print('Saved coordinates to file ...')
 
 
 if __name__ == '__main__':
-    ply_filename = "cur_kal_20m_20200214_decvis_02_subsampler100000.ply"
-    annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
+    ply_filename = "cur_sna_05m_20200303_decvis_02.ply"
+    annotations_filename = "cur_sna_05m_20200303_decvis_02_SF_HI_19-1-22.txt"
     subsets_filename = "subsets.json"
 
+    # WP05 cur_kal_05m_20200214_decvis_02_KP
+    # theta -6.91, psi 21.08
+    # WP10 cur_kal_10m_20200214_decvis_02_KP_905.txt
+    # theta = -25.11, psi = 11.65
+    # WP20 cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed
+    # theta = 9.02, psi = 19.25
+    # SB10 cur_sna_10m_20201202_decvisann_HI_14-12-21
+    # theta = -0.72, psi = -2.71
+    # SB20 cur_sna_20m_20190410_decvisann_HI_12_12
+    # theta = -16.82, psi = 18.23
     main(ply_filename, annotations_filename, subsets_filename)
