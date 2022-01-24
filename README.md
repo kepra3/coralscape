@@ -1,3 +1,5 @@
 # coralscape_open3d
-Custom scripts for measuring coral reef microhabitat structural complexity using open3D and numpy.
-Statistical analyses of multilevel/hierarchical linear regression.
+
+Custom scripts for measuring coral reef microhabitat structural complexity on 3D point cloud data (structure-from-motion photogrammetry) using open3D and numpy packages in python.
+
+Statistical analyses of multilevel/hierarchical linear regression conducted in R.
