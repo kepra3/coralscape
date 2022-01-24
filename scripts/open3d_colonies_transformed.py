@@ -23,7 +23,7 @@ __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SB05"
+PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SB10"
 # check sample 897 in plot
 
 class Viscore_metadata(object):
@@ -133,7 +133,7 @@ def generate_connecting_lineset(connect_points, connect_colors):
     return connecting_lineset
 
 
-def calc_attachment_angles(colonies, axes_order):
+def calc_attachment_angles(colonies, axes_order, interval_num):
     # TODO: select a point every three
     """
     :param colonies: colony point clouds
@@ -147,12 +147,28 @@ def calc_attachment_angles(colonies, axes_order):
         if len(sample) <= 3:
             continue
 
+        # Select interval
+        interval_axes_one = (sample[:, 0].max() - sample[:, 0].min()) / interval_num
+        intervals = [0]
+        subset = {}
+        representative_points = []
+        for i in range(1, interval_num):
+            intervals.append(sample[:, 0].min()+interval_axes_one*i)
+            q = np.where(sample[:, 0] < intervals[i])
+            subset[i] = q
+            representative_points.append(np.random.choice(subset[i][0], size=3))
+            # TODO: test different sizes and draw
+        # Get rid of hierarchical structure in List
+        rep_points_list = [element for sublist in representative_points for element in sublist]
+
+        # Choose points
+        axes_one = np.array(sample[rep_points_list, axes_order[0]]).reshape(-1, 1)
+        axes_two = np.array(sample[rep_points_list, axes_order[1]])
+
         # Fit a line
-        axes_one = np.array(sample[::3, axes_order[0]]).reshape(-1, 1)  # sampling every third point
-        axes_two = np.array(sample[::3, axes_order[1]])
-        axes_three = np.mean(sample[:, axes_order[2]])
         model = LinearRegression().fit(axes_one, axes_two)
         # r_sq = model.score(axes_one, axes_two)
+        # calculate residuals of the model
         axes_two_prediction = (model.intercept_ + model.coef_ * axes_one).reshape(-1, 1)
 
         # Calculate theta
@@ -303,9 +319,10 @@ def main(ply_filename, annotations_filename, subsets_filename):
     #o3d.visualization.draw_geometries(all_geoms)
 
     # Calculate rotated colony angles
-    theta_xy = calc_attachment_angles(rotated_colonies, axes_order=[0, 1, 2])
-    theta_xz = calc_attachment_angles(rotated_colonies, axes_order=[0, 2, 1])
-    theta_yz = calc_attachment_angles(rotated_colonies, axes_order=[1, 2, 0])
+    # TODO: test optimisation of slope angle
+    theta_xy = calc_attachment_angles(rotated_colonies, axes_order=[0, 1, 2], interval_num=10)
+    theta_xz = calc_attachment_angles(rotated_colonies, axes_order=[0, 2, 1], interval_num=10)
+    theta_yz = calc_attachment_angles(rotated_colonies, axes_order=[1, 2, 0], interval_num=10)
 
     # Calculate relative height and overhang
     overhang_value = 0.1 / viscore_md.scale_factor
@@ -326,33 +343,35 @@ def main(ply_filename, annotations_filename, subsets_filename):
 
     scaled_annotations_df = pd.DataFrame(scaled_annotations).T
     scaled_annotations_df.columns = ['x', 'y', 'z']
-    scaled_annotations_df.to_csv('~/git/coralscape_open3d/results/scaled_annotations_{}.csv'.format(ply_filename))
+    scaled_annotations_df.to_csv('~/git/coralscape/results/scaled_annotations_{}.csv'.format(ply_filename))
     print('Saved scaled annotations to file ...')
 
     # Convert to .csv for input to R
     df = pd.DataFrame(sample_metadata).T
     df.columns = ['xy', 'xz', 'yz', 'prop', 'overhang', 'range']
     df['range'] = df['range'] * viscore_md.scale_factor  # scaled range
-    df.to_csv('~/git/coralscape_open3d/results/sample_metadata_{}.csv'.format(ply_filename))
+    df.to_csv('~/git/coralscape/results/sample_metadata_{}.csv'.format(ply_filename))
     print('Saved metadata to file ...')
 
     coordinates = pd.DataFrame(rotated_annotations).T
     coordinates.columns = ['x', 'y', 'z']
-    coordinates.to_csv('~/git/coralscape_open3d/results/rotated_coordinates_{}.csv'.format(ply_filename))
+    coordinates.to_csv('~/git/coralscape/results/rotated_coordinates_{}.csv'.format(ply_filename))
     print('Saved coordinates to file ...')
 
 
 if __name__ == '__main__':
-    ply_filename = "cur_sna_05m_20200303_decvis_02.ply"
-    annotations_filename = "cur_sna_05m_20200303_decvis_02_SF_HI_19-1-22.txt"
+    ply_filename = "cur_sna_10m_20200303_decvis_02.ply"
+    annotations_filename = "cur_sna_10m_20201202_decvisann_HI_14-12-21.txt"
     subsets_filename = "subsets.json"
 
     # WP05 cur_kal_05m_20200214_decvis_02_KP
     # theta -6.91, psi 21.08
-    # WP10 cur_kal_10m_20200214_decvis_02_KP_905.txt
+    # WP10 cur_kal_10m_20200214_decvis_02_KP_905
     # theta = -25.11, psi = 11.65
     # WP20 cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed
     # theta = 9.02, psi = 19.25
+    # SB05 cur_sna_05m_20200303_decvis_02_SF_HI_19-1-22
+    # theta = -3.90, psi = 12.30
     # SB10 cur_sna_10m_20201202_decvisann_HI_14-12-21
     # theta = -0.72, psi = -2.71
     # SB20 cur_sna_20m_20190410_decvisann_HI_12_12
