@@ -158,9 +158,9 @@ coefs$p.z <- 2 * (1 - pnorm(abs(coefs$t.value)))
 coefs
 # post-hoc
 emmeans(lmer1.theta, list(pairwise ~ Clusters), adjust = "tukey")
-#AA1 - AL2   -5.893 2.15 237 -2.737  0.0718
+#AA1 - AL2   -5.893 2.15 237 -2.737  0.0718 `
 #AA1 - AH1   -9.774 2.41 164 -4.054  0.0011 **
-#AA1 - AA2   -8.362 3.02 232 -2.771  0.0659
+#AA1 - AA2   -8.362 3.02 232 -2.771  0.0659 `
 #AA1 - AL1   -9.629 2.94 249 -3.274  0.0152 * 
 
 # mixed model 2
@@ -177,6 +177,14 @@ emmeans(lmer2.theta, list(pairwise ~ Clusters), adjust = "tukey")
 # Warning message:
 #  In ptukey(sqrt(2) * abst, fam.size, zapsmall(df), lower.tail = FALSE) :
 #  NaNs produced
+
+# including colony size
+lmer3.theta <- lmer(theta ~ Clusters * range + (1|Loc/Depth), data = metadata)
+summary(lmer3.theta)
+coefs <- data.frame(coef(summary(lmer3.theta)))
+coefs$p.z <- 2 * (1 - pnorm(abs(coefs$t.value)))
+coefs
+emmeans(lmer3.theta, list(pairwise ~ Clusters), adjust = "tukey")
 
 
 # 3. outcrop proportion ####
