@@ -59,9 +59,9 @@ k_boxplot <- function(df, cat, cont) {
 }
 
 # Import datasets
-struc.complex <- read.csv("~/git/coralscape_open3d/results/sample_metadata.csv")
+struc.complex <- read.csv("~/git/coralscape/results/sample_metadata.csv")
 clusters <- read.csv("~/Dropbox/agaricia_project_2019/shalo_ag/gen_project/data/all-aga_1d_nc_20_6.csv")
-coordinates <- read.csv("~/git/coralscape_open3d/results/annotations.csv")
+coordinates <- read.csv("~/git/coralscape/results/annotations.csv")
 
 # Organise data
 metadata <- combine_metadata(struc.complex, clusters, coordinates)
@@ -112,7 +112,7 @@ k_boxplot(metadata, metadata$Clusters, metadata$z) + ggtitle('Relative depth')
 #### Linear Models ####
 # 1. overhang #### will become overhang %
 metadata$overhang.bin <- ifelse(metadata$overhang == "Yes", 1, 0)
-glmer1.overhang <- glmer(overhang ~ Clusters + (1|Loc/Depth), data = metadata, family = binomial) # won't work
+glmer1.overhang <- glmer(overhang.bin ~ Clusters + (1|Loc/Depth), data = metadata, family = binomial) # won't work
 # boundary (singular) fit: see ?isSingular - means the random effects don't use too much variation
 summary(glmer1.overhang)
 #Warning messages:
@@ -178,7 +178,7 @@ emmeans(lmer2.theta, list(pairwise ~ Clusters), adjust = "tukey")
 #  In ptukey(sqrt(2) * abst, fam.size, zapsmall(df), lower.tail = FALSE) :
 #  NaNs produced
 
-# including colony size
+# including colony size ####
 lmer3.theta <- lmer(theta ~ Clusters * range + (1|Loc/Depth), data = metadata)
 summary(lmer3.theta)
 coefs <- data.frame(coef(summary(lmer3.theta)))
@@ -186,6 +186,15 @@ coefs$p.z <- 2 * (1 - pnorm(abs(coefs$t.value)))
 coefs
 emmeans(lmer3.theta, list(pairwise ~ Clusters), adjust = "tukey")
 
+
+# including overhang ####
+lmer4.theta <- lmer(theta ~ Clusters * overhang + (1|Loc/Depth), data = metadata)
+summary(lmer4.theta)
+coefs <- data.frame(coef(summary(lmer4.theta)))
+coefs$p.z <- 2 * (1 - pnorm(abs(coefs$t.value)))
+coefs
+emmeans(lmer4.theta, list(pairwise ~ Clusters), adjust = "tukey")
+# maybe issue because some species have no overhang presence
 
 # 3. outcrop proportion ####
 hist(metadata[metadata$Clusters == "AA1",]$prop)

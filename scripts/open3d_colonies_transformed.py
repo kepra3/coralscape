@@ -23,7 +23,9 @@ __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SB10"
+PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/WP20"
+
+
 # check sample 897 in plot
 
 class Viscore_metadata(object):
@@ -81,7 +83,7 @@ def calculate_euler_angle(opposite, adjacent):
     return theta.__float__()
 
 
-def rotate_matrix(pcd, up_vector, short_name):
+def rotate_matrix(pcd, up_vector):
     # TODO: use euler angles to rotate pcd and annotations
     # up_vector = viscore_md.dd[0:3]
     origin = [0, 0, 0]
@@ -89,8 +91,6 @@ def rotate_matrix(pcd, up_vector, short_name):
     x_diff = origin[0] - up_vector[0]  # opposite - reef perpendicular
     z_diff = origin[2] - up_vector[2]  # adjacent - depth
     theta_xz = calculate_euler_angle(x_diff, z_diff)
-    #if short_name == "cur_sna_20m_20201202":
-    #    theta_xz = -theta_xz
     print('Theta is ...', theta_xz)
     # angle yz, psi
     y_diff = origin[1] - up_vector[1]  # opposite - reef parallel, y-coord stays the same
@@ -115,10 +115,49 @@ def get_ranges(annotations_path, annotations):
     for name in annotations:
         # euclidean distance
         ranges[name] = (((complete_set['{}_left'.format(name)][0] - complete_set['{}_right'.format(name)][0]) ** 2
-                        + (complete_set['{}_left'.format(name)][1] - complete_set['{}_right'.format(name)][1]) ** 2
-                        + (complete_set['{}_left'.format(name)][2] - complete_set['{}_right'.format(name)][2]) ** 2) \
+                         + (complete_set['{}_left'.format(name)][1] - complete_set['{}_right'.format(name)][1]) ** 2
+                         + (complete_set['{}_left'.format(name)][2] - complete_set['{}_right'.format(name)][2]) ** 2) \
                         ** 0.5) / 2
     return ranges
+
+
+def get_neighbourhood(annotations, pcd, ranges, viscore_md=None, lines=False):
+
+    print('Building KDTree ...')
+    pcd_tree = o3d.geometry.KDTreeFlann(pcd)
+
+    colonies = {}
+
+    if lines:
+        translated_colonies = {}
+        connect_points = []
+        connect_colors = []
+    else:
+        print("Connecting lines not used")
+
+    print('Searching ...')
+    for name in annotations:
+        [k, idx, _] = pcd_tree.search_radius_vector_3d(annotations[name], ranges[name])
+        # Store colony as separate point cloud
+        colonies[name] = o3d.geometry.PointCloud()
+        colonies[name].points = o3d.utility.Vector3dVector(np.asarray(pcd.points)[idx[1:], :])
+        if lines:
+            random_color = list(np.random.choice(np.linspace(0, 1, 255), size=3))
+            colonies[name].paint_uniform_color(random_color)
+            connect_colors.append(random_color)
+            # Vertical offset along up vector
+            v_translation = np.array(viscore_md.dd[0:3]) * V_DISTANCE
+            translated_colonies[name] = copy.deepcopy(colonies[name])
+            translated_colonies[name].translate(v_translation)
+            # Store points for the connecting lines
+            connect_points.append(annotations[name])
+            connect_points.append(annotations[name] + v_translation)
+        else:
+            continue
+    if lines:
+        return colonies, translated_colonies, connect_points
+    else:
+        return colonies
 
 
 def generate_connecting_lineset(connect_points, connect_colors):
@@ -153,7 +192,7 @@ def calc_attachment_angles(colonies, axes_order, interval_num):
         subset = {}
         representative_points = []
         for i in range(1, interval_num):
-            intervals.append(sample[:, 0].min()+interval_axes_one*i)
+            intervals.append(sample[:, 0].min() + interval_axes_one * i)
             q = np.where(sample[:, 0] < intervals[i])
             subset[i] = q
             representative_points.append(np.random.choice(subset[i][0], size=3))
@@ -194,12 +233,6 @@ def calc_relative_height_and_overhang(rotated_colonies, rotated_annotations, ran
         colony_mean_height = np.mean(sample[:, 2])
         heights[name] = colony_mean_height
 
-        # Use a larger radius, i.e., environment
-        [k, idx, _] = pcd_tree_r.search_radius_vector_3d(rotated_annotations[name], ranges[name] * 2)
-        # Store colony environment as separate point cloud
-        colonies_environment_r[name] = o3d.geometry.PointCloud()
-        colonies_environment_r[name].points = o3d.utility.Vector3dVector(np.asarray(pcd_r.points)[idx[1:], :])
-
         # Extract points
         sample_environment_r = np.asarray(colonies_environment_r[name].points)
         env_min_height = min(sample_environment_r[:, 2])
@@ -209,40 +242,60 @@ def calc_relative_height_and_overhang(rotated_colonies, rotated_annotations, ran
         # Proportion
         all_relative_heights[name] = (colony_mean_height - env_min_height) / env_height_range
 
-        x_high = (rotated_annotations[name][0] + overhang_value)
-        x_low = (rotated_annotations[name][0] - overhang_value)
-        y_high = (rotated_annotations[name][1] + overhang_value)
-        y_low = (rotated_annotations[name][1] - overhang_value)
-
-        # Overhang presence
-        overhang = sample_environment_r[(sample_environment_r[:, 0] < x_high.__float__()) &
-                                        (sample_environment_r[:, 0] > x_low.__float__()) &
-                                        (sample_environment_r[:, 1] < y_high.__float__()) &
-                                        (sample_environment_r[:, 1] > y_low.__float__())]
-        overhang_list = []
-        for i in range(0, len(overhang[:, 2])):
-            if overhang[:, 2][i] > (rotated_annotations[name][2] + (overhang_value * 2)):
-                overhang_list.append('Yes')
+        overhang_range = []
+        for i in range(1, 20):
+            # Trying to make stop if exceed range for that sample.
+            print('Sample is:', name)
+            x_high = (rotated_annotations[name][0] + overhang_value * i)
+            print("x_high:", x_high)
+            x_low = (rotated_annotations[name][0] - overhang_value * i)
+            print("x_low:", x_low)
+            y_high = (rotated_annotations[name][1] + overhang_value * i)
+            print("y_high:", y_high)
+            y_low = (rotated_annotations[name][0] - overhang_value * i)
+            print("y_low:", y_low)
+            print("x_range:", (x_high - x_low))
+            print("y_range:", (y_high - y_low))
+            print("range:", ranges[name])
+            print("overhang:", overhang_value * 1)
+            if ranges[name] < (x_high - x_low) and ranges[name] < (y_high - y_low):
+                break
             else:
-                overhang_list.append('No')
+                # Overhang presence TODO: see notes figure out expanding cylinder problem
+                overhang = sample_environment_r[(sample_environment_r[:, 0] < x_high.__float__()) &
+                                                (sample_environment_r[:, 0] > x_high.__float__() - overhang_value * i) &
 
-        if overhang_list.count('Yes') > 1:
-            overhang_presence = 'Yes'
-        else:
-            overhang_presence = 'No'
+                                                (sample_environment_r[:, 0] > x_low.__float__()) &
+                                                (sample_environment_r[:, 1] < y_high.__float__()) &
+                                                (sample_environment_r[:, 1] > y_low.__float__())]
+                overhang_list = []
+                for j in range(0, len(overhang[:, 2])):
+                    if overhang[:, 2][j] > (rotated_annotations[name][2] + (overhang_value * 2)):
+                        overhang_list.append(1)  # Yes
+                    else:
+                        overhang_list.append(0)  # No
 
-        all_overhang[name] = overhang_presence
+                if overhang_list.count(1) > 1:
+                    overhang_presence = 1
+                else:
+                    overhang_presence = 0
+
+                overhang_range.append(overhang_presence)
+                print('overhang range is', overhang_range)
+        print('overhang range is', overhang_range)
+        overhang_prop = sum(overhang_range) / len(overhang_range)
+        all_overhang[name] = overhang_prop
     return all_relative_heights, all_overhang
 
 
-#def calc_overhang(colonies, range, pcd):
-    # TODO: subset a cylinder and calculate proportion of z values shaded,
-    #  use an expanding cylinder from centre?
+# def calc_overhang(colonies, range, pcd):
+# TODO: subset a cylinder and calculate proportion of z values shaded,
+#  use an expanding cylinder from centre?
 #    all_overhang_percentage = {}
 #    return all_overhang_percentage
 
 
-#def calc_rugosity():
+# def calc_rugosity():
 #    # TODO: calculate rugosity! Look at xz and yz profiles and then calculate the distances between each point over a specific x or y distance.
 #    all_rugosity_colony = {}
 #    all_rugosity_environment = {}
@@ -264,14 +317,10 @@ def main(ply_filename, annotations_filename, subsets_filename):
     R = rotate_matrix(pcd, up_vector, short_name)
     pcd_r = copy.deepcopy(pcd)
     pcd_r.rotate(R, center=(0, 0, 0))
-    # Visualise rotated tree
-    # o3d.visualization.draw_geometries([pcd_r])
-
-    print('Build KDTree from point cloud ...')
-    pcd_tree_r = o3d.geometry.KDTreeFlann(pcd_r)
 
     print('Read assignment file ...')
     annotations = get_annotations('{}/{}'.format(PATH, annotations_filename))
+
     print('Rotate annotations ...')
     rotated_annotations = {}
     for name in annotations:
@@ -280,43 +329,8 @@ def main(ply_filename, annotations_filename, subsets_filename):
     print('Get ranges for each sample ...')
     ranges = get_ranges('{}/{}'.format(PATH, annotations_filename), annotations)
 
-    print('Searching radius around annotations ...')
-    translated_colonies = {}
-    rotated_colonies = {}
-    connect_points = []
-    connect_colors = []
-    for name in rotated_annotations:
-        [k, idx, _] = pcd_tree_r.search_radius_vector_3d(rotated_annotations[name], ranges[name])
-        # Store colony as separate point cloud
-        rotated_colonies[name] = o3d.geometry.PointCloud()
-        rotated_colonies[name].points = o3d.utility.Vector3dVector(np.asarray(pcd_r.points)[idx[1:], :])
-        random_color = list(np.random.choice(np.linspace(0, 1, 255), size=3))
-        rotated_colonies[name].paint_uniform_color(random_color)
-        connect_colors.append(random_color)
-        # Vertical offset along up vector
-        v_translation = np.array(viscore_md.dd[0:3]) * V_DISTANCE
-        translated_colonies[name] = copy.deepcopy(rotated_colonies[name])
-        translated_colonies[name].translate(v_translation)
-        # Store points for the connecting lines
-        connect_points.append(rotated_annotations[name])
-        connect_points.append(rotated_annotations[name] + v_translation)
-    # Create connected lineset
-    connecting_lineset = generate_connecting_lineset(connect_points, connect_colors)
-    # Join all geometries
-    all_geoms = list(translated_colonies.values())
-    all_geoms.append(pcd_r)
-    all_geoms.append(connecting_lineset)
-    # Visualise
-    #o3d.visualization.draw_geometries(all_geoms,
-    #                                  zoom=0.4,
-    #                                  front=viscore_md.cam_eye,
-    #                                  lookat=viscore_md.cam_target,
-    #                                  up=viscore_md.cam_up)
-
-    all_geoms = list(rotated_colonies.values())
-    #o3d.visualization.draw_geometries(all_geoms)
-    all_geoms.append(pcd_r)
-    #o3d.visualization.draw_geometries(all_geoms)
+    print("Searching for colony around annotations ...")
+    rotated_colonies = get_neighbourhood(rotated_annotations, pcd_r, ranges)
 
     # Calculate rotated colony angles
     # TODO: test optimisation of slope angle
@@ -324,13 +338,24 @@ def main(ply_filename, annotations_filename, subsets_filename):
     theta_xz = calc_attachment_angles(rotated_colonies, axes_order=[0, 2, 1], interval_num=10)
     theta_yz = calc_attachment_angles(rotated_colonies, axes_order=[1, 2, 0], interval_num=10)
 
+    # Define neighbourhood range
+    double_range = {}
+    for name in ranges:
+        double_range[name] = ranges[name] * 2
+    print('Getting neighbourhood range')
+    colonies_environment_r = get_neighbourhood(rotated_annotations, pcd_r, double_range)
+
     # Calculate relative height and overhang
-    overhang_value = 0.1 / viscore_md.scale_factor
+    overhang_value = 0.01 / viscore_md.scale_factor
     relative_height, overhang = calc_relative_height_and_overhang(rotated_colonies, rotated_annotations, ranges,
                                                                   pcd_r, pcd_tree_r, overhang_value)
+    # Scale ranges
+    scaled_ranges = copy.deepcopy(ranges)
+    for name in ranges:
+        scaled_ranges[name] = ranges[name] * viscore_md.scale_factor
 
     # Join dictionaries
-    dicts = [theta_xy, theta_xz, theta_yz, relative_height, overhang, ranges]
+    dicts = [theta_xy, theta_xz, theta_yz, relative_height, overhang, scaled_ranges]
     sample_metadata = {}
     for key in dicts[0]:
         sample_metadata[key] = [d[key] for d in dicts]
@@ -360,8 +385,8 @@ def main(ply_filename, annotations_filename, subsets_filename):
 
 
 if __name__ == '__main__':
-    ply_filename = "cur_sna_10m_20200303_decvis_02.ply"
-    annotations_filename = "cur_sna_10m_20201202_decvisann_HI_14-12-21.txt"
+    ply_filename = "cur_kal_20m_20200214_decvis_02.ply"
+    annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
     subsets_filename = "subsets.json"
 
     # WP05 cur_kal_05m_20200214_decvis_02_KP
