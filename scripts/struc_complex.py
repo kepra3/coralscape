@@ -16,7 +16,7 @@ __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SB20"
+PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/WP20"
 
 
 class Viscore_metadata(object):
@@ -71,6 +71,7 @@ def calculate_euler_angle(opposite, adjacent):
     elif adjacent == 0 & opposite < 0:
         theta = (np.arctan(opposite / adjacent) - np.pi / 2) * 180 / np.pi
     else:
+        theta = None
         print("theta is undefined")
     return theta.__float__()
 
@@ -78,7 +79,7 @@ def calculate_euler_angle(opposite, adjacent):
 def rotate_matrix(pcd, up_vector):
     """ Create rotation matrix from euler angles and up vector """
     origin = [0, 0, 0]
-    # angle xz, phi
+    # angle xz, theta
     x_diff = origin[0] - up_vector[0]  # opposite - reef perpendicular
     z_diff = origin[2] - up_vector[2]  # adjacent - depth
     theta_xz = calculate_euler_angle(x_diff, z_diff)
@@ -106,10 +107,13 @@ def get_ranges(annotations_path, annotations):
     ranges = {}
     for name in annotations:
         # euclidean distance
-        ranges[name] = (((complete_set['{}_left'.format(name)][0] - complete_set['{}_right'.format(name)][0]) ** 2
-                         + (complete_set['{}_left'.format(name)][1] - complete_set['{}_right'.format(name)][1]) ** 2
-                         + (complete_set['{}_left'.format(name)][2] - complete_set['{}_right'.format(name)][2]) ** 2) \
-                        ** 0.5) / 2
+        x1 = complete_set['{}_left'.format(name)][0]
+        x2 = complete_set['{}_right'.format(name)][0]
+        y1 = complete_set['{}_left'.format(name)][1]
+        y2 = complete_set['{}_right'.format(name)][1]
+        z1 = complete_set['{}_left'.format(name)][2]
+        z2 = complete_set['{}_right'.format(name)][2]
+        ranges[name] = ((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2) ** 0.5 / 2
     return ranges
 
 
@@ -127,9 +131,11 @@ def get_neighbourhood(annotations, pcd, pcd_tree, ranges, viscore_md=None, lines
     print('Searching ...')
     for name in annotations:
         [k, idx, _] = pcd_tree.search_radius_vector_3d(annotations[name], ranges[name])
-        # Store colony as separate point cloud
+        # Store colony as separate point cloud with points, normals and colours!!!
         colonies[name] = o3d.geometry.PointCloud()
         colonies[name].points = o3d.utility.Vector3dVector(np.asarray(pcd.points)[idx[1:], :])
+        colonies[name].normals = o3d.utility.Vector3dVector(np.asarray(pcd.normals)[idx[1:], :])
+        colonies[name].colors = o3d.utility.Vector3dVector(np.asarray(pcd.colors)[idx[1:], :])
         if lines:
             random_color = list(np.random.choice(np.linspace(0, 1, 255), size=3))
             colonies[name].paint_uniform_color(random_color)
@@ -233,6 +239,10 @@ def calc_outcrop_proportion(colonies, environment):
 
 def calc_overhang(annotations, overhang_value, environment, ranges):
     """ Using cylindrical coordinates find the overhang proportion in an expanding radius"""
+    # TODO: issue at the moment this function is capturing points that are simply higher than the focal point
+    # need to look in a break in distribution in z and check whether points are shadowing
+    # i.e., a break in height with the same values for x and y
+    # create a cone and check break in distribution, plot points in a histogram
     all_overhang = {}
 
     for name in annotations:
@@ -246,24 +256,26 @@ def calc_overhang(annotations, overhang_value, environment, ranges):
                           (environment_array[:, 0] - annotations[name][0]))
         z = environment_array[:, 2] - annotations[name][2]
         cylinder_coords = np.array([r, theta, z])
-        # all coordinates within environment that are greater than 1cm
+        # consider all coordinates within environment that are greater than 1cm above overhang value (it should be
+        # colony max height)
         cylinder_coords_high = cylinder_coords[:, cylinder_coords[2, :] > overhang_value]
 
         for i in range(1, 20):
+            print("round:", i)
             # Trying to make stop if exceed range for that sample.
-            radius = overhang_value * i  # radius: x and y values
+            radius = overhang_value * i  # radius: x and y values (1 cm and increasing up until colony radius)
             if ranges[name] < radius:
                 print('range smaller than radius')
                 break
             else:
                 # subset to all points within 1cm xy of annotated point
-                overhang = cylinder_coords_high[:, (cylinder_coords_high[1, :] < overhang_value * i) &
-                                                   (cylinder_coords_high[1, :] > overhang_value * (i - 1))]
-                print(overhang)
+                overhang = cylinder_coords_high[:, (cylinder_coords_high[0, :] < overhang_value * i) &
+                                                   (cylinder_coords_high[0, :] > overhang_value * (i - 1))]
+                print("length of considered points", len(overhang[2, :]))
                 overhang_list = []
                 for j in range(0, len(overhang[2, :])):
-                    # check if there are any points greater than overhang value
-                    if overhang[2, :][j] > (overhang_value * 2):  # z: height
+                    # check if there are any points greater than overhang value * 2 (2 cm)
+                    if overhang[2, :][j] > ():  # z: height
                         overhang_list.append(1)  # Yes
                     else:
                         overhang_list.append(0)  # No
@@ -274,7 +286,7 @@ def calc_overhang(annotations, overhang_value, environment, ranges):
                     overhang_presence = 0
                 else:
                     overhang_presence = 0
-                print(overhang_presence)
+                print('overhang_presence:', overhang_presence)
 
                 overhang_range.append(overhang_presence)
         if len(overhang_range) == 0:
@@ -308,15 +320,18 @@ def main(ply_filename, annotations_filename, subsets_filename):
     pcd_r = copy.deepcopy(pcd)
     pcd_r.rotate(R, center=(0, 0, 0))
 
+    print('Scaling point cloud ...')
+    # TODO: scale everything so that calculations make more sense!
+
     print('Read assignment file ...')
     annotations = get_annotations('{}/{}'.format(PATH, annotations_filename))
 
-    print('Rotate annotations ...')
+    print('Rotate and scale annotations ...')  # TODO: scale
     rotated_annotations = {}
     for name in annotations:
         rotated_annotations[name] = np.matmul(R, annotations[name])
 
-    print('Get ranges for each sample ...')
+    print('Get ranges for each sample and scale...')  # TODO: scale
     ranges = get_ranges('{}/{}'.format(PATH, annotations_filename), annotations)
 
     print('Building KDTree ...')
@@ -335,6 +350,8 @@ def main(ply_filename, annotations_filename, subsets_filename):
     double_range = {}
     for name in ranges:
         double_range[name] = ranges[name] * 2
+        print('double range is:', double_range[name])
+
     print('Getting neighbourhood range')
     rotated_environment = get_neighbourhood(rotated_annotations, pcd_r, pcd_tree_r, double_range)
 
@@ -345,13 +362,8 @@ def main(ply_filename, annotations_filename, subsets_filename):
     overhang_value = 0.01 / viscore_md.scale_factor
     overhang = calc_overhang(rotated_annotations, overhang_value, rotated_environment, ranges)
 
-    # Scale ranges
-    scaled_ranges = copy.deepcopy(ranges)
-    for name in ranges:
-        scaled_ranges[name] = ranges[name] * viscore_md.scale_factor
-
     # Join dictionaries
-    dicts = [theta_xy, theta_xz, theta_yz, outcrop, overhang, scaled_ranges]
+    dicts = [theta_xy, theta_xz, theta_yz, outcrop, overhang, ranges]
     sample_metadata = {}
     for key in dicts[0]:
         sample_metadata[key] = [d[key] for d in dicts]
@@ -370,19 +382,28 @@ def main(ply_filename, annotations_filename, subsets_filename):
     # Convert to .csv for input to R
     df = pd.DataFrame(sample_metadata).T
     df.columns = ['xy', 'xz', 'yz', 'outcrop_prop', 'overhang_prop', 'range']
-    df['range'] = df['range'] * viscore_md.scale_factor  # scaled range
+
+    # Scale range
+    df['range'] = df['range'] * viscore_md.scale_factor  # scaled range !!!
+
+    # Save to file
     df.to_csv('~/git/coralscape/results/sample_metadata_{}.csv'.format(ply_filename))
     print('Saved metadata to file ...')
 
-    coordinates = pd.DataFrame(rotated_annotations).T
-    coordinates.columns = ['x', 'y', 'z']
-    coordinates.to_csv('~/git/coralscape/results/rotated_coordinates_{}.csv'.format(ply_filename))
-    print('Saved coordinates to file ...')
+    # Choosing six colonies to write to file
+    # KP0287_LM_WP20, KP0350_LM_WP20, KP0558_LM_WP20
+    # KP0479_AC_WP20, KP0490_AC_WP20, KP0554_AC_WP20
+    for name in ['KP0287_LM_WP20', 'KP0350_LM_WP20', 'KP0558_LM_WP20',
+                 'KP0479_AC_WP20', 'KP0490_AC_WP20', 'KP0554_AC_WP20']:
+        colony = rotated_colonies[name]
+        print(colony)
+        print(type(colony))
+        o3d.io.write_point_cloud('{}.ply'.format(name), colony)  # should save normals & rgb
 
 
 if __name__ == '__main__':
-    ply_filename = "cur_sna_20m_20200303_decvis_02.ply"
-    annotations_filename = "cur_sna_20m_20190410_decvisann_HI_12_12.txt"
+    ply_filename = "cur_kal_20m_20200214_decvis_02.ply"
+    annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
     subsets_filename = "subsets.json"
 
     # WP05 cur_kal_05m_20200214_decvis_02_KP

@@ -73,7 +73,7 @@ rm(coordinates)
 
 # Data structure
 str(metadata)
-metadata[, c(2:6, 13, 24)] <- data.frame(lapply(metadata[, c(2:6, 13, 24)], as.factor))
+metadata[, c(2:6, 13)] <- data.frame(lapply(metadata[, c(2:6, 13)], as.factor))
 levels(metadata$Clusters) <- c("AA1", "AL2", "AH1", "AA2", "AL1","AH2")
 str(metadata)
 
@@ -93,8 +93,7 @@ for (row in 1:length(metadata$xz)) {
 
 # Environmental data ####
 # Overhang
-overhang_barplot(metadata, metadata$Species)  # Species
-overhang_barplot(metadata, metadata$Clusters)  # Cluster
+boxplot(metadata$overhang_prop ~ metadata$Clusters)
 
 # Theta
 k_boxplot(metadata, metadata$Species, metadata$theta) + ggtitle('Theta')
@@ -102,8 +101,8 @@ k_boxplot(metadata, metadata$Clusters, metadata$theta) + ggtitle('Theta')
 # maybe colony rugosity would be good to include here!
 
 # Relative depth proportion species
-k_boxplot(metadata, metadata$Species, metadata$prop) + ggtitle('Outcrop position')
-k_boxplot(metadata, metadata$Clusters, metadata$prop) + ggtitle('Outcrop position')
+k_boxplot(metadata, metadata$Species, metadata$outcrop_prop) + ggtitle('Outcrop position')
+k_boxplot(metadata, metadata$Clusters, metadata$outcrop_prop) + ggtitle('Outcrop position')
 
 # Z
 k_boxplot(metadata, metadata$Species, metadata$z) + ggtitle('Relative depth') # doesn't mean anything for now
