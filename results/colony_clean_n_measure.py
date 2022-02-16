@@ -5,13 +5,7 @@
 """
 @author: kprata
 @date created: 9/2/22
-@description: TODO: segmenting colony, semantic segmentation?
-# For keeping normals/rgb values maybe try directly changing the pcd
-pcd = o3d.geometry.PointCloud()
-pcd.points = o3d.utility.Vector3dVector(point_cloud[:,:3])
-pcd.colors = o3d.utility.Vector3dVector(point_cloud[:,3:6]/255)
-pcd.normals = o3d.utility.Vector3dVector(point_cloud[:,6:9])
-
+@description:
 """
 
 import argparse
@@ -24,9 +18,6 @@ from typing import Any
 
 
 def create_mesh_ball_pivot(pcd):
-    pcd.estimate_normals()
-    # NEED TO GET TRUE NORMALS!
-
     # estimate radius for rolling ball
     distances = pcd.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
@@ -96,8 +87,6 @@ def largest_cluster(mesh, cluster_n_triangles, triangle_clusters):
 
 
 def fit_a_plane_ransac(pcd):
-    # First scale pcd points
-    pcd.scale(0.18, center=(0, 0, 0))
     plane_model, inliers = pcd.segment_plane(distance_threshold=0.001,
                                              ransac_n=3,
                                              num_iterations=1000)
@@ -106,12 +95,12 @@ def fit_a_plane_ransac(pcd):
     return plane_model, inliers
 
 
-def plot_plane(pcd, plane_model, scale, z_adjust):
+def plot_plane(pcd, plane_model, z_adjust):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    points = ax.scatter(xs=np.asarray(pcd.points)[:, 0] * scale,
-                        ys=np.asarray(pcd.points)[:, 1] * scale,
-                        zs=np.asarray(pcd.points)[:, 2] * scale,
+    points = ax.scatter(xs=np.asarray(pcd.points)[:, 0],
+                        ys=np.asarray(pcd.points)[:, 1],
+                        zs=np.asarray(pcd.points)[:, 2],
                         c='red')
     ax.set_xlabel("Reef parallel")
     ax.set_ylabel("Reef perpendicular")
@@ -121,19 +110,22 @@ def plot_plane(pcd, plane_model, scale, z_adjust):
     #ax.set_zlim(min(np.asarray(pcd.points)[:, 2]) * scale, max(np.asarray(pcd.points)[:, 2]) * scale)
     # NEED TO CHOOSE BETTER X AND Y VALUES! Choose based on the inliers
     # what are two furthest points once rotated
-    x = np.linspace(min(np.asarray(pcd.points)[:, 0]) * scale, max(np.asarray(pcd.points)[:, 0]) * scale, 10)
-    y = np.linspace(min(np.asarray(pcd.points)[:, 1]) * scale, max(np.asarray(pcd.points)[:, 1]) * scale, 10)
+    x = np.linspace(min(np.asarray(pcd.points)[:, 0]), max(np.asarray(pcd.points)[:, 0]), 10)
+    y = np.linspace(min(np.asarray(pcd.points)[:, 1]), max(np.asarray(pcd.points)[:, 1]), 10)
     X, Y = np.meshgrid(x, y)
-    Z = ((plane_model[0] * X) + (plane_model[1] * Y) + (plane_model[3]*scale) / plane_model[2]*scale) + z_adjust
+    Z = plane_model[3] - (plane_model[0] * X + plane_model[1] * Y) / plane_model[2] + z_adjust
     surf = ax.plot_surface(X, Y, Z, alpha=0.5)
     print('Showing points and plane ...')
     plt.show()
 
 
 def rotate_based_on_plane(pcd, plane_model):
-    psi = np.arccos(plane_model[0] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2))
+    # using the formula
+    # plane_normal dot axis of interest normal / (magnitude of plane normal * magnitude of axis of interest normal)
+    # which simplifies to
+    psi = np.arccos(plane_model[0] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2)**0.5)
     print(psi * 180 / np.pi)  # about x-axis (yz)
-    theta = np.arccos(plane_model[1] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2))
+    theta = np.arccos(plane_model[1] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2)**0.5)
     print(theta * 180 / np.pi)  # about y-axis (xy)
     R = pcd.get_rotation_matrix_from_xyz((psi, theta, 0))
     pcd_r = copy.deepcopy(pcd)
@@ -143,16 +135,17 @@ def rotate_based_on_plane(pcd, plane_model):
 
 def get_rugosity(pcd, threeD_area, scale):
     # need to find the largest distances between x and y once oriented (i.e., rotate points then find max xy)
-    x_diff = (max(np.asarray(pcd.points)[:, 0]) - min(np.asarray(pcd.points)[:, 0])) * scale
-    y_diff = (max(np.asarray(pcd.points)[:, 1]) - min(np.asarray(pcd.points)[:, 1])) * scale
-    twoD_area = (x_diff * y_diff)
+    x_diff = (max(np.asarray(pcd.points)[:, 0]) - min(np.asarray(pcd.points)[:, 0]))
+    y_diff = (max(np.asarray(pcd.points)[:, 1]) - min(np.asarray(pcd.points)[:, 1]))
+    r = (x_diff ** 2 + y_diff ** 2) ** 0.5 / 2
+    twoD_area = np.pi * r ** 2 * (scale**2)
     print('2D area is ...', twoD_area)
-    rugosity = threeD_area / twoD_area
+    rugosity = threeD_area / twoD_area  # threeD_area is smaller than twoD_area because irregular shape
     print("Rugosity is ...", rugosity)
     return rugosity
 
 
-def main(filename, largest_cluster_mesh):
+def main(filename, largest_cluster_mesh, scale):
     # import point cloud
     pcd = o3d.io.read_point_cloud("{}.ply".format(filename))
 
@@ -170,10 +163,10 @@ def main(filename, largest_cluster_mesh):
     if largest_cluster_mesh == 'Yes':
         large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
         triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
-        threeD_area = cluster_area * (0.18**2)
+        threeD_area = cluster_area * (scale**2)
     else:
         large_mesh = mesh_removed
-        threeD_area = np.sum(cluster_area) * (0.18**2)
+        threeD_area = np.sum(cluster_area) * (scale**2)
         'Print not subsampling to largest mesh'
 
     print('Cluster area is ... {} m^2'.format(threeD_area))
@@ -186,22 +179,27 @@ def main(filename, largest_cluster_mesh):
 
     # Fit a plane to point cloud
     print('Fitting a plane')
+
     plane_model, inliers = fit_a_plane_ransac(pcd)
     display_inlier_outlier(pcd, inliers)
 
     # plot plane & point
-    plot_plane(pcd, plane_model, scale=0.18)
+    plot_plane(pcd, plane_model, z_adjust=0.40)
 
     # rotate points
     pcd_r = rotate_based_on_plane(pcd, plane_model)
-    plot_plane(pcd_r, plane_model, scale=0.18, z_adjust=-1.75)  # trial and error with this!
+    plot_plane(pcd_r, plane_model, z_adjust=-0.97)  # trial and error with this!
 
     # Rugosity
-    rugosity = get_rugosity(pcd, threeD_area, scale=0.18)
+    rugosity = get_rugosity(pcd_r, threeD_area, scale)
 
     # mesh cone to use for caclulating overhang
     # o3d.geometry.create_mesh_cone(radius=1.0, height=2.0, resolution=20, split=1)
-
+    # Scale points
+    # print('Scaling points!!!')
+    # pcd_scaled = copy.deepcopy(pcd)
+    # pcd_scaled.points = o3d.utility.Vector3dVector(np.asarray(pcd.points) * scale)
+    # o3d.visualization.draw_geometries([pcd_scaled])
 
 if __name__ == '__main__':
     # 287 overhang included but removed with mesh
@@ -214,7 +212,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog="Colony clean and measure")
     parser.add_argument('filename')  # e.g., KP0287_LM_WP20
     parser.add_argument('largest_cluster_mesh')  # e.g., Yes or No
+    parser.add_argument('scale', type=float)
     args = parser.parse_args()
     filename = args.filename
     largest_cluster_mesh = args.largest_cluster_mesh
-    main(filename, largest_cluster_mesh)
+    scale = args.scale
+    main(filename, largest_cluster_mesh, scale)
