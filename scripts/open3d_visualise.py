@@ -12,10 +12,10 @@ import numpy as np  # very useful package that can basically do everything!
 # import json
 # import copy
 
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/WP20"
+PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/"
 # V_DISTANCE = -10
-ply_filename = "cur_kal_20m_20200214_decvis_02_subsampler100000.ply"
-annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
+ply_filename = "cur_kal_40m_20200214_dec5M.ply"
+#annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
 radius = 2  # choose a radius around your colony
 # subsets_filename = "subsets.json" if you have an upvector!!
 # short_name = "_".join(ply_filename.split('_')[0:4])
@@ -25,6 +25,8 @@ pcd = o3d.io.read_point_cloud('{}/{}'.format(PATH, ply_filename))
 
 print('Build KDTree from point cloud ...')
 pcd_tree = o3d.geometry.KDTreeFlann(pcd)
+
+o3d.visualization.draw_geometries([pcd])
 
 print('Read assignment file ...')
 annotations_path = '{}/{}'.format(PATH, annotations_filename)

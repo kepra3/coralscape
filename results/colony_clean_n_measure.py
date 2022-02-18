@@ -15,6 +15,8 @@ import copy
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from typing import Any
+import alphashape
+from descartes import PolygonPatch
 
 
 def create_mesh_ball_pivot(pcd):
@@ -126,22 +128,69 @@ def rotate_based_on_plane(pcd, plane_model):
     psi = np.arccos(plane_model[0] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2)**0.5)
     print(psi * 180 / np.pi)  # about x-axis (yz)
     theta = np.arccos(plane_model[1] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2)**0.5)
-    print(theta * 180 / np.pi)  # about y-axis (xy)
+    print(theta * 180 / np.pi)  # about y-axis (xz)
     R = pcd.get_rotation_matrix_from_xyz((psi, theta, 0))
     pcd_r = copy.deepcopy(pcd)
     pcd_r.rotate(R, center=(0, 0, 0))
     return pcd_r
 
 
-def get_rugosity(pcd, threeD_area, scale):
-    # need to find the largest distances between x and y once oriented (i.e., rotate points then find max xy)
-    x_diff = (max(np.asarray(pcd.points)[:, 0]) - min(np.asarray(pcd.points)[:, 0]))
-    y_diff = (max(np.asarray(pcd.points)[:, 1]) - min(np.asarray(pcd.points)[:, 1]))
-    r = (x_diff ** 2 + y_diff ** 2) ** 0.5 / 2
-    twoD_area = np.pi * r ** 2 * (scale**2)
+def get_rugosity(pcd_r, threeD_area, scale):
+    # project points onto 2D xy axes
+    print('Projecting points to xy plane, z=0')
+    x = np.asarray(pcd_r.points)[:, 0]
+    y = np.asarray(pcd_r.points)[:, 1]
+    z = np.repeat(0, len(np.asarray(pcd_r.points)[:, 1]))
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    points = ax.scatter(xs=x,
+                    ys=y,
+                    zs=z,
+                    c='red')
+    ax.set_xlabel("Reef parallel")
+    ax.set_ylabel("Reef perpendicular")
+    ax.set_zlabel("Depth")
+    x1 = np.linspace(min(np.asarray(pcd_r.points)[:, 0]), max(np.asarray(pcd_r.points)[:, 0]), 10)
+    y1 = np.linspace(min(np.asarray(pcd_r.points)[:, 1]), max(np.asarray(pcd_r.points)[:, 1]), 10)
+    X, Y = np.meshgrid(x1, y1)
+    Z = np.zeros((10,10))
+    surf = ax.plot_surface(X, Y, Z, alpha=0.5)
+    plt.show()
+
+    print('Creating polygon for 2D points')
+    points_2d = np.asarray((x, y)).transpose()
+    fig, ax = plt.subplots()
+    ax.scatter(x=points_2d[:,0], y=points_2d[:,1])
+    alpha_shape = alphashape.alphashape(points_2d, 2.0)
+    ax.add_patch(PolygonPatch(alpha_shape, alpha=0.2))
+    plt.show()
+    twoD_area = alpha_shape.area * (scale ** 2)
     print('2D area is ...', twoD_area)
-    rugosity = threeD_area / twoD_area  # threeD_area is smaller than twoD_area because irregular shape
-    print("Rugosity is ...", rugosity)
+
+    #print('Creating polygon for 3D points')
+    #points_3d = np.asarray(pcd_r.points)
+    #fig = plt.figure()
+    #ax = plt.axes(projection='3d')
+    #ax.scatter(xs=points_3d[:, 0],
+    #           ys=points_3d[:, 1],
+    #           zs=points_3d[:, 2],
+    #           c='red')
+    #ax.set_xlabel("Reef parallel")
+    #ax.set_ylabel("Reef perpendicular")
+    #ax.set_zlabel("Depth")
+    #alpha_shape = alphashape.alphashape(points_3d, 1.1)
+    #ax.plot_trisurf(*zip(*alpha_shape.vertices), triangles=alpha_shape.faces)
+    #plt.show()
+    # threeD_area_2 = alpha_shape.area * (scale ** 2)
+    #print('3D area is ...', threeD_area_2)
+    print('Rugosity is', threeD_area / twoD_area)
+    # print('rugosity 2 is', threeD_area_2 / twoD_area)
+    rugosity = threeD_area / twoD_area
+    if rugosity < 1:
+        print("shape complex rugosity likely essentially 1")
+        rugosity = 1
+    else:
+        pass
     return rugosity
 
 
@@ -205,8 +254,8 @@ if __name__ == '__main__':
     # 287 overhang included but removed with mesh
     # 350 is a large/difficult one, but it actually worked!
     # 479 Mesh isn't connect through whole colony thus largest cluster removes part of colony thus say No
-    # 490 is weird! Not sure of real structure here.
-    # 554 Mesh doesn't work so well also need point normals, so say No
+    # 490 is small
+    # 554 works well with normals
     # 558
     # Arguments
     parser = argparse.ArgumentParser(prog="Colony clean and measure")
