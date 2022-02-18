@@ -17,7 +17,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from typing import Any
 import alphashape
 from descartes import PolygonPatch
-
+from sklearn.linear_model import LinearRegression
 
 def create_mesh_ball_pivot(pcd):
     # estimate radius for rolling ball
@@ -95,6 +95,27 @@ def fit_a_plane_ransac(pcd):
     [a, b, c, d] = plane_model
     print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
     return plane_model, inliers
+
+
+def fit_a_lm(pcd, axes_order):
+    # Choose points
+    axes_one = np.asarray(pcd.points)[:, axes_order[0]].reshape(-1, 1)
+    axes_two = np.asarray(pcd.points)[:, axes_order[1]]
+
+    # Fit a line
+    model = LinearRegression().fit(axes_one, axes_two)
+    r_sq = model.score(axes_one, axes_two)
+    print('R squared is ...', r_sq)
+
+    # Calculate residuals of the model
+    axes_two_prediction = (model.intercept_ + model.coef_ * axes_one).reshape(-1, 1)
+
+    # Calculate theta
+    axes_one_diff = abs(axes_one[1] - axes_one[0])
+    axes_two_diff = abs(axes_two_prediction[1] - axes_two_prediction[0])
+    theta = np.arctan(axes_two_diff / axes_one_diff) * 180 / np.pi
+    print('Theta is ...', theta)
+    return theta.__float__()
 
 
 def plot_plane(pcd, plane_model, z_adjust):
@@ -226,18 +247,30 @@ def main(filename, largest_cluster_mesh, scale):
     pcd = large_mesh.sample_points_poisson_disk(number_of_points=500, pcl=pcd)
     o3d.visualization.draw_geometries([pcd])
 
-    # Fit a plane to point cloud
-    print('Fitting a plane')
+    # Fit a linear model
+    print('Fitting a linear model')
+    theta_xz = fit_a_lm(pcd, axes_order=[0, 2])  # not good fit
+    psi_yz = fit_a_lm(pcd, axes_order=[1, 2])  # pretty good fit
+    theta_radians = theta_xz / (180 * np.pi)
+    psi_radians = psi_yz / (180 * np.pi)
+    # TODO: figure out why xz angle so different for KP0479_AC_WP20
 
-    plane_model, inliers = fit_a_plane_ransac(pcd)
-    display_inlier_outlier(pcd, inliers)
+    # Rotate points based on linear model angles
+    R = pcd.get_rotation_matrix_from_xyz((psi_radians, theta_radians, 0))
+    pcd_r = copy.deepcopy(pcd)
+    pcd_r.rotate(R, center=(0, 0, 0))
+    # Fit a plane to point cloud
+    #print('Fitting a plane')
+
+    #plane_model, inliers = fit_a_plane_ransac(pcd)
+    #display_inlier_outlier(pcd, inliers)
 
     # plot plane & point
-    plot_plane(pcd, plane_model, z_adjust=0.40)
+    #plot_plane(pcd, plane_model, z_adjust=0.40)
 
     # rotate points
-    pcd_r = rotate_based_on_plane(pcd, plane_model)
-    plot_plane(pcd_r, plane_model, z_adjust=-0.97)  # trial and error with this!
+    #pcd_r = rotate_based_on_plane(pcd, plane_model)
+    #plot_plane(pcd_r, plane_model, z_adjust=-0.97)  # trial and error with this!
 
     # Rugosity
     rugosity = get_rugosity(pcd_r, threeD_area, scale)
@@ -249,6 +282,7 @@ def main(filename, largest_cluster_mesh, scale):
     # pcd_scaled = copy.deepcopy(pcd)
     # pcd_scaled.points = o3d.utility.Vector3dVector(np.asarray(pcd.points) * scale)
     # o3d.visualization.draw_geometries([pcd_scaled])
+
 
 if __name__ == '__main__':
     # 287 overhang included but removed with mesh

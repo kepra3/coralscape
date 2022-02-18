@@ -200,7 +200,8 @@ def calc_attachment_angles(colonies, axes_order, interval_num):
 
         # Fit a line
         model = LinearRegression().fit(axes_one, axes_two)
-        # r_sq = model.score(axes_one, axes_two)
+        r_sq = model.score(axes_one, axes_two)
+        print('R squared is ...', r_sq)
         # calculate residuals of the model
         axes_two_prediction = (model.intercept_ + model.coef_ * axes_one).reshape(-1, 1)
 
