@@ -300,11 +300,6 @@ def calc_overhang(annotations, overhang_value, environment, ranges):
     return all_overhang
 
 
-# def calc_rugosity(): # TODO: calculate rugosity! Look at xz and yz profiles and then calculate the distances
-#  between each point over a specific x or y distance. all_rugosity_colony = {} all_rugosity_environment = {} return
-#  all_rugosity_colony, all_rugosity_environment
-
-
 def main(ply_filename, annotations_filename, subsets_filename):
     # Make a short name from the file name
     short_name = "_".join(ply_filename.split('_')[0:4])
