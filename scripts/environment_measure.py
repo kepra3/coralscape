@@ -79,6 +79,16 @@ def remove_small_clusters(mesh, cluster_n_triangles, triangle_clusters, threshol
     return mesh_removed
 
 
+def largest_cluster(mesh, cluster_n_triangles, triangle_clusters):
+    large_mesh: o3d.cpu.pybind.geometry.TriangleMesh = copy.deepcopy(mesh)
+    largest_cluster_idx = cluster_n_triangles.argmax()
+    triangles_to_remove = triangle_clusters != largest_cluster_idx
+    large_mesh.remove_triangles_by_mask(triangles_to_remove)
+    print("Show largest cluster")
+    o3d.visualization.draw_geometries([large_mesh])
+    return large_mesh
+
+
 def fit_a_lm(pcd, axes_order):
     # Choose points
     axes_one = np.asarray(pcd.points)[:, axes_order[0]].reshape(-1, 1)
@@ -100,7 +110,7 @@ def fit_a_lm(pcd, axes_order):
     return theta.__float__()
 
 
-def get_rugosity(pcd_r, threeD_area, scale):
+def get_rugosity(pcd_r, threeD_area):
     # project points onto 2D xy axes
     print('Projecting points to xy plane, z=0')
     x = np.asarray(pcd_r.points)[:, 0]
@@ -109,45 +119,45 @@ def get_rugosity(pcd_r, threeD_area, scale):
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     points = ax.scatter(xs=x,
-                    ys=y,
-                    zs=z,
-                    c='red')
+                        ys=y,
+                        zs=z,
+                        c='red')
     ax.set_xlabel("Reef parallel")
     ax.set_ylabel("Reef perpendicular")
     ax.set_zlabel("Depth")
     x1 = np.linspace(min(np.asarray(pcd_r.points)[:, 0]), max(np.asarray(pcd_r.points)[:, 0]), 10)
     y1 = np.linspace(min(np.asarray(pcd_r.points)[:, 1]), max(np.asarray(pcd_r.points)[:, 1]), 10)
     X, Y = np.meshgrid(x1, y1)
-    Z = np.zeros((10,10))
+    Z = np.zeros((10, 10))
     surf = ax.plot_surface(X, Y, Z, alpha=0.5)
     plt.show()
 
     print('Creating polygon for 2D points')
     points_2d = np.asarray((x, y)).transpose()
     fig, ax = plt.subplots()
-    ax.scatter(x=points_2d[:,0], y=points_2d[:,1])
+    ax.scatter(x=points_2d[:, 0], y=points_2d[:, 1])
     alpha_shape = alphashape.alphashape(points_2d, 2.0)
     ax.add_patch(PolygonPatch(alpha_shape, alpha=0.2))
     plt.show()
     twoD_area = alpha_shape.area * (scale ** 2)
     print('2D area is ...', twoD_area)
 
-    #print('Creating polygon for 3D points')
-    #points_3d = np.asarray(pcd_r.points)
-    #fig = plt.figure()
-    #ax = plt.axes(projection='3d')
-    #ax.scatter(xs=points_3d[:, 0],
+    # print('Creating polygon for 3D points')
+    # points_3d = np.asarray(pcd_r.points)
+    # fig = plt.figure()
+    # ax = plt.axes(projection='3d')
+    # ax.scatter(xs=points_3d[:, 0],
     #           ys=points_3d[:, 1],
     #           zs=points_3d[:, 2],
     #           c='red')
-    #ax.set_xlabel("Reef parallel")
-    #ax.set_ylabel("Reef perpendicular")
-    #ax.set_zlabel("Depth")
-    #alpha_shape = alphashape.alphashape(points_3d, 1.1)
-    #ax.plot_trisurf(*zip(*alpha_shape.vertices), triangles=alpha_shape.faces)
-    #plt.show()
+    # ax.set_xlabel("Reef parallel")
+    # ax.set_ylabel("Reef perpendicular")
+    # ax.set_zlabel("Depth")
+    # alpha_shape = alphashape.alphashape(points_3d, 1.1)
+    # ax.plot_trisurf(*zip(*alpha_shape.vertices), triangles=alpha_shape.faces)
+    # plt.show()
     # threeD_area_2 = alpha_shape.area * (scale ** 2)
-    #print('3D area is ...', threeD_area_2)
+    # print('3D area is ...', threeD_area_2)
     print('Rugosity is', threeD_area / twoD_area)
     # print('rugosity 2 is', threeD_area_2 / twoD_area)
     rugosity = threeD_area / twoD_area
@@ -159,52 +169,80 @@ def get_rugosity(pcd_r, threeD_area, scale):
     return rugosity
 
 
-def main(filename, largest_cluster_mesh, scale):
+def calc_overhang(pcd, pcd_env):
+    dists = pcd_env.compute_point_cloud_distance(pcd)
+    dists = np.asarray(dists)
+    ind = np.where(dists < 0.01)[0]
+    not_ind = np.where(dists > 0.01)[0]
+    np.asarray(pcd_env.colors)[ind] = [0, 0, 1]
+    o3d.visualization.draw_geometries([pcd_env])
+    colony = np.asarray(pcd_env.points)[ind]
+    env = np.asarray(pcd_env.points)
+    q = []
+    for i in range(0, len(colony)):
+        p = np.where((env[:, 0] < colony[i, 0] + 0.01) & (env[:, 0] > colony[i, 0] - 0.01) &
+                     (env[:, 1] < colony[i, 1] + 0.01) & (env[:, 1] > colony[i, 1] - 0.01) &
+                     (env[:, 2] > max(colony[:, 2])))
+        if p[0].size:
+            np.asarray(pcd_env.colors)[p[0]] = [1, 0, 0]
+            if len(p[0]) > 1:
+                for j in range(0, len(p)):
+                    p_int = int(p[0][j])
+                    q.append(p_int)
+            elif len(p[0]) == 1:
+                p_int = int(p[0])
+                q.append(p_int)
+
+    o3d.visualization.draw_geometries([pcd_env])
+    unique_q = list()
+    unique_points = 0
+    for item in q:
+        if item not in unique_q:
+            unique_q.append(item)
+            unique_points += 1
+    print(unique_q)
+
+    overhang_prop = unique_points/len(colony)  # proportion works for now but area would be better
+    return overhang_prop
+
+
+def main(filename, largest_cluster_mesh):
     # import point cloud
     pcd = o3d.io.read_point_cloud("{}.ply".format(filename))
     pcd_env = o3d.io.read_point_cloud("{}_env.ply".format(filename))
 
     o3d.visualization.draw_geometries([pcd])
     o3d.visualization.draw_geometries([pcd_env])
-
     # Remove outlier points
-    ind = remove_outlier_points(pcd_env)
-    display_inlier_outlier(pcd_env, ind)
+    #ind = remove_outlier_points(pcd_env)
+    #display_inlier_outlier(pcd_env, ind)  # may need to do this
 
     # Create mesh
     mesh = create_mesh_ball_pivot(pcd)
-    o3d.visualization.draw_geometries([mesh])  # need to clean points before meshing in some cases maybe
+    #o3d.visualization.draw_geometries([mesh])  # need to clean points before meshing in some cases maybe
     triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
     mesh_removed = remove_small_clusters(mesh, cluster_n_triangles, triangle_clusters, threshold=5)
-    large_mesh = mesh_removed
-    threeD_area = np.sum(cluster_area) * (scale ** 2)
+    if largest_cluster_mesh == 'Yes':
+        large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
+        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
+        threeD_area = cluster_area
+    else:
+        large_mesh = mesh_removed
+        threeD_area = np.sum(cluster_area)
+        'Print not subsampling to largest mesh'
 
     print('Cluster area is ... {} m^2'.format(threeD_area))
 
     # Convert mesh back to point cloud within non-clustered sampling, i.e., using poisson
     print('Sampling points from mesh first uniformaly then with poisson ...')
-    pcd = large_mesh.sample_points_uniformly(number_of_points=2500)
-    pcd = large_mesh.sample_points_poisson_disk(number_of_points=500, pcl=pcd)
+    pcd = large_mesh.sample_points_uniformly(number_of_points=len(np.asarray(pcd.points)))
+    pcd = large_mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(pcd.points)), pcl=pcd)
     o3d.visualization.draw_geometries([pcd])
 
-    # Fit a linear model
-    print('Fitting a linear model')
-    theta_xz = fit_a_lm(pcd, axes_order=[0, 2])
-    psi_yz = fit_a_lm(pcd, axes_order=[1, 2])
-    theta_radians = theta_xz / (180 * np.pi)
-    psi_radians = psi_yz / (180 * np.pi)
-    # TODO: figure out why xz angle so different for KP0479_AC_WP20
-
-    # Rotate points based on linear model angles
-    R = pcd.get_rotation_matrix_from_xyz((psi_radians, theta_radians, 0))
-    pcd_r = copy.deepcopy(pcd)
-    pcd_r.rotate(R, center=(0, 0, 0))
-
-    # Rugosity
-    rugosity = get_rugosity(pcd_r, threeD_area, scale)
-
-    # TODO: overhang - need colony pcd and environment pcd
     # overhang
+    overhang = calc_overhang(pcd, pcd_env)
+    print(overhang)
+
 
 if __name__ == '__main__':
     # 287 overhang included but removed with mesh
@@ -217,9 +255,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog="Colony clean and measure")
     parser.add_argument('filename')  # e.g., KP0287_LM_WP20
     parser.add_argument('largest_cluster_mesh')  # e.g., Yes or No
-    parser.add_argument('scale', type=float)
     args = parser.parse_args()
     filename = args.filename
     largest_cluster_mesh = args.largest_cluster_mesh
-    scale = args.scale
-    main(filename, largest_cluster_mesh, scale)
+    main(filename, largest_cluster_mesh)

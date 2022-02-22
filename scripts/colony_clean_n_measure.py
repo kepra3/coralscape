@@ -129,9 +129,9 @@ def plot_plane(pcd, plane_model, z_adjust):
     ax.set_xlabel("Reef parallel")
     ax.set_ylabel("Reef perpendicular")
     ax.set_zlabel("Depth")
-    #ax.set_xlim(min(np.asarray(pcd.points)[:, 0]) * scale, max(np.asarray(pcd.points)[:, 0]) * scale)
-    #ax.set_ylim(min(np.asarray(pcd.points)[:, 1]) * scale, max(np.asarray(pcd.points)[:, 1]) * scale)
-    #ax.set_zlim(min(np.asarray(pcd.points)[:, 2]) * scale, max(np.asarray(pcd.points)[:, 2]) * scale)
+    # ax.set_xlim(min(np.asarray(pcd.points)[:, 0]) * scale, max(np.asarray(pcd.points)[:, 0]) * scale)
+    # ax.set_ylim(min(np.asarray(pcd.points)[:, 1]) * scale, max(np.asarray(pcd.points)[:, 1]) * scale)
+    # ax.set_zlim(min(np.asarray(pcd.points)[:, 2]) * scale, max(np.asarray(pcd.points)[:, 2]) * scale)
     # NEED TO CHOOSE BETTER X AND Y VALUES! Choose based on the inliers
     # what are two furthest points once rotated
     x = np.linspace(min(np.asarray(pcd.points)[:, 0]), max(np.asarray(pcd.points)[:, 0]), 10)
@@ -147,9 +147,9 @@ def rotate_based_on_plane(pcd, plane_model):
     # using the formula
     # plane_normal dot axis of interest normal / (magnitude of plane normal * magnitude of axis of interest normal)
     # which simplifies to
-    psi = np.arccos(plane_model[0] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2)**0.5)
+    psi = np.arccos(plane_model[0] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2) ** 0.5)
     print('The angle between y and z is ...', psi * 180 / np.pi)  # about x-axis (yz)
-    theta = np.arccos(plane_model[1] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2)**0.5)
+    theta = np.arccos(plane_model[1] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2) ** 0.5)
     print('The angle between x and z is ...', theta * 180 / np.pi)  # about y-axis (xz)
     R = pcd.get_rotation_matrix_from_xyz((psi, theta, 0))
     pcd_r = copy.deepcopy(pcd)
@@ -166,45 +166,45 @@ def get_rugosity(pcd_r, threeD_area, scale):
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     points = ax.scatter(xs=x,
-                    ys=y,
-                    zs=z,
-                    c='red')
+                        ys=y,
+                        zs=z,
+                        c='red')
     ax.set_xlabel("Reef parallel")
     ax.set_ylabel("Reef perpendicular")
     ax.set_zlabel("Depth")
     x1 = np.linspace(min(np.asarray(pcd_r.points)[:, 0]), max(np.asarray(pcd_r.points)[:, 0]), 10)
     y1 = np.linspace(min(np.asarray(pcd_r.points)[:, 1]), max(np.asarray(pcd_r.points)[:, 1]), 10)
     X, Y = np.meshgrid(x1, y1)
-    Z = np.zeros((10,10))
+    Z = np.zeros((10, 10))
     surf = ax.plot_surface(X, Y, Z, alpha=0.5)
     plt.show()
 
     print('Creating polygon for 2D points')
     points_2d = np.asarray((x, y)).transpose()
     fig, ax = plt.subplots()
-    ax.scatter(x=points_2d[:,0], y=points_2d[:,1])
+    ax.scatter(x=points_2d[:, 0], y=points_2d[:, 1])
     alpha_shape = alphashape.alphashape(points_2d, 2.0)
     ax.add_patch(PolygonPatch(alpha_shape, alpha=0.2))
     plt.show()
     twoD_area = alpha_shape.area * (scale ** 2)
     print('2D area is ...', twoD_area)
 
-    #print('Creating polygon for 3D points')
-    #points_3d = np.asarray(pcd_r.points)
-    #fig = plt.figure()
-    #ax = plt.axes(projection='3d')
-    #ax.scatter(xs=points_3d[:, 0],
+    # print('Creating polygon for 3D points')
+    # points_3d = np.asarray(pcd_r.points)
+    # fig = plt.figure()
+    # ax = plt.axes(projection='3d')
+    # ax.scatter(xs=points_3d[:, 0],
     #           ys=points_3d[:, 1],
     #           zs=points_3d[:, 2],
     #           c='red')
-    #ax.set_xlabel("Reef parallel")
-    #ax.set_ylabel("Reef perpendicular")
-    #ax.set_zlabel("Depth")
-    #alpha_shape = alphashape.alphashape(points_3d, 1.1)
-    #ax.plot_trisurf(*zip(*alpha_shape.vertices), triangles=alpha_shape.faces)
-    #plt.show()
+    # ax.set_xlabel("Reef parallel")
+    # ax.set_ylabel("Reef perpendicular")
+    # ax.set_zlabel("Depth")
+    # alpha_shape = alphashape.alphashape(points_3d, 1.1)
+    # ax.plot_trisurf(*zip(*alpha_shape.vertices), triangles=alpha_shape.faces)
+    # plt.show()
     # threeD_area_2 = alpha_shape.area * (scale ** 2)
-    #print('3D area is ...', threeD_area_2)
+    # print('3D area is ...', threeD_area_2)
     print('Rugosity is', threeD_area / twoD_area)
     # print('rugosity 2 is', threeD_area_2 / twoD_area)
     rugosity = threeD_area / twoD_area
@@ -234,10 +234,10 @@ def main(filename, largest_cluster_mesh, scale):
     if largest_cluster_mesh == 'Yes':
         large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
         triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
-        threeD_area = cluster_area * (scale**2)
+        threeD_area = cluster_area * (scale ** 2)
     else:
         large_mesh = mesh_removed
-        threeD_area = np.sum(cluster_area) * (scale**2)
+        threeD_area = np.sum(cluster_area) * (scale ** 2)
         'Print not subsampling to largest mesh'
 
     print('Cluster area is ... {} m^2'.format(threeD_area))
@@ -262,17 +262,17 @@ def main(filename, largest_cluster_mesh, scale):
     pcd_r.rotate(R, center=(0, 0, 0))
 
     # Fit a plane to point cloud
-    #print('Fitting a plane')
+    # print('Fitting a plane')
 
-    #plane_model, inliers = fit_a_plane_ransac(pcd)
-    #display_inlier_outlier(pcd, inliers)
+    # plane_model, inliers = fit_a_plane_ransac(pcd)
+    # display_inlier_outlier(pcd, inliers)
 
     # plot plane & point
-    #plot_plane(pcd, plane_model, z_adjust=0.40)
+    # plot_plane(pcd, plane_model, z_adjust=0.40)
 
     # rotate points
-    #pcd_r = rotate_based_on_plane(pcd, plane_model)
-    #plot_plane(pcd_r, plane_model, z_adjust=-0.97)  # trial and error with this!
+    # pcd_r = rotate_based_on_plane(pcd, plane_model)
+    # plot_plane(pcd_r, plane_model, z_adjust=-0.97)  # trial and error with this!
 
     # Rugosity
     rugosity = get_rugosity(pcd_r, threeD_area, scale)

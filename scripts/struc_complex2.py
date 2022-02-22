@@ -21,7 +21,7 @@ __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/WP20"
+PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SB20"
 
 
 class Viscore_metadata(object):
@@ -393,16 +393,11 @@ def main(ply_filename, annotations_filename, subsets_filename):
     ranges = get_ranges('{}/{}'.format(PATH, annotations_filename), annotations, viscore_md.scale_factor)
     print('Building KDTree ...')
     pcd_tree_r = o3d.geometry.KDTreeFlann(pcd_r)
+
+    # GET COLONIES AND ENV
     print("Searching for colony around annotations ...")
     colonies = get_neighbourhood(rotated_scaled_annotations, pcd_r, pcd_tree_r, ranges)
 
-    #### 2. COLONY STATISTICS ####
-    colony_angles, colony_rugosity = calc_colony_metrics(colonies)
-    # TODO: angles being weird need to work out how to restrict to 0 - 90
-    # TODO: rugosity sometimes really high need to check for specific colonies
-
-    ### 3. ENVIRONMENT STATISTICS ####
-    # Define neighbourhood range
     double_range = {}
     for name in ranges:
         double_range[name] = ranges[name] * 2
@@ -410,6 +405,14 @@ def main(ply_filename, annotations_filename, subsets_filename):
 
     print('Getting neighbourhood range')
     environment = get_neighbourhood(rotated_scaled_annotations, pcd_r, pcd_tree_r, double_range)
+
+    #### 2. COLONY STATISTICS ####
+    colony_angles, colony_rugosity = calc_colony_metrics(colonies)
+    # TODO: rugosity sometimes high (5) check for specific colonies
+
+    ### 3. ENVIRONMENT STATISTICS ####
+    # Define neighbourhood range
+
     print('Calculating outcrop proportion ...')
     outcrop = calc_outcrop_proportion(colonies, environment)
     print('Calculate environment rugosity ...')
@@ -428,17 +431,28 @@ def main(ply_filename, annotations_filename, subsets_filename):
     df.to_csv('~/git/coralscape/results/sample_metadata_{}.csv'.format(ply_filename))
     print('Saved metadata to file ...')
 
-    for name in ['KP0287_LM_WP20', 'KP0350_LM_WP20', 'KP0558_LM_WP20',
-                 'KP0479_AC_WP20', 'KP0490_AC_WP20', 'KP0554_AC_WP20']:
-        colony_env = environment[name]
-        print(colony_env)
-        print(type(colony_env))
-        o3d.io.write_point_cloud('{}_env.ply'.format(name), colony_env)  # should save normals & rgb
+    anno_df = pd.DataFrame(rotated_scaled_annotations).T
+    anno_df.columns = ['x', 'y', 'z']
+    anno_df.to_csv('~/git/coralscape/results/scaled_annotations_{}.csv'.format(ply_filename))
+
+    #for name in ['KP0287_LM_WP20', 'KP0350_LM_WP20', 'KP0558_LM_WP20',
+    #             'KP0479_AC_WP20', 'KP0490_AC_WP20', 'KP0554_AC_WP20']:
+    #    colony_env = environment[name]
+    #    print(colony_env)
+    #    print(type(colony_env))
+    #    o3d.io.write_point_cloud('{}_env.ply'.format(name), colony_env)  # should save normals & rgb
+
+    #for name in ['KP0287_LM_WP20', 'KP0350_LM_WP20', 'KP0558_LM_WP20',
+    #             'KP0479_AC_WP20', 'KP0490_AC_WP20', 'KP0554_AC_WP20']:
+    #    colony_ind = colonies[name]
+    #    print(colony_ind)
+    #    print(type(colony_ind))
+    #    o3d.io.write_point_cloud('{}.ply'.format(name), colony_ind)  # should save normals & rgb
 
 
 if __name__ == '__main__':
-    ply_filename = "cur_kal_20m_20200214_decvis_02.ply"
-    annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
+    ply_filename = "cur_sna_20m_20200303_decvis_02.ply"
+    annotations_filename = "cur_sna_20m_20190410_decvisann_HI_12_12.txt"
     subsets_filename = "subsets.json"
 
     # WP05 cur_kal_05m_20200214_decvis_02_KP
@@ -449,8 +463,10 @@ if __name__ == '__main__':
     # theta = 9.02, psi = 19.25
     # SB05 cur_sna_05m_20200303_decvis_02_SF_HI_19-1-22
     # theta = -3.90, psi = 12.30
+    # SB10 cur_sna_10m_20200303_decvis_02
     # SB10 cur_sna_10m_20201202_decvisann_HI_14-12-21
     # theta = -0.72, psi = -2.71
+    # SB20 cur_sna_20m_20200303_decvis_02
     # SB20 cur_sna_20m_20190410_decvisann_HI_12_12
     # theta = -16.82, psi = 18.23
     main(ply_filename, annotations_filename, subsets_filename)
