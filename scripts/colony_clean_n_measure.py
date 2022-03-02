@@ -20,6 +20,21 @@ from descartes import PolygonPatch
 from sklearn.linear_model import LinearRegression
 
 
+def plot_colony(pcd):
+    x = np.asarray(pcd.points)[:, 0]
+    y = np.asarray(pcd.points)[:, 1]
+    z = np.asarray(pcd.points)[:, 2]
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    points = ax.scatter(xs=x,
+                        ys=y,
+                        zs=z,
+                        c=np.asarray(pcd.colors))
+    ax.set_xlabel("Reef parallel")
+    ax.set_ylabel("Reef perpendicular")
+    ax.set_zlabel("Depth")
+
+
 def create_mesh_ball_pivot(pcd):
     # estimate radius for rolling ball
     distances = pcd.compute_nearest_neighbor_distance()
@@ -94,7 +109,6 @@ def fit_a_plane_ransac(pcd):
                                              ransac_n=3,
                                              num_iterations=1000)
     [a, b, c, d] = plane_model
-    print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
     return plane_model, inliers
 
 
@@ -102,6 +116,7 @@ def fit_a_lm(pcd, axes_order):
     # Choose points
     axes_one = np.asarray(pcd.points)[:, axes_order[0]].reshape(-1, 1)
     axes_two = np.asarray(pcd.points)[:, axes_order[1]]
+    axes_three = np.asarray(pcd.points)[:, axes_order[2]]
 
     # Fit a line
     model = LinearRegression().fit(axes_one, axes_two)
@@ -116,10 +131,31 @@ def fit_a_lm(pcd, axes_order):
     axes_two_diff = abs(axes_two_prediction[1] - axes_two_prediction[0])
     theta = np.arctan(axes_two_diff / axes_one_diff) * 180 / np.pi
     print('Theta is ...', theta)
+
+    # Plot points
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel("Reef perpendicular")
+    ax.set_ylabel("Reef parallel")
+    ax.set_zlabel("Depth")
+    ax.scatter(xs=axes_one,
+               ys=axes_three,
+               zs=axes_two,
+               c=np.asarray(pcd.colors))
+
+    # Plot a plane
+    plane_one = np.arange(min(axes_one), max(axes_one), np.std(axes_one))
+    plane_three = [min(axes_three), np.mean(axes_three), max(axes_three)]
+    # plane_two = (model.intercept_ + model.coef_ * plane_one).reshape(-1, 1)
+    ONE, THREE = np.meshgrid(plane_one, plane_three)
+    TWO = (model.intercept_ + model.coef_ * ONE)
+    ax.plot_surface(ONE, THREE, TWO, color='red', alpha=0.3)
+    plt.show()
+
     return theta.__float__()
 
 
-def plot_plane(pcd, plane_model, z_adjust):
+def plot_plane(pcd, plane_model, inliers):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     points = ax.scatter(xs=np.asarray(pcd.points)[:, 0],
@@ -129,15 +165,11 @@ def plot_plane(pcd, plane_model, z_adjust):
     ax.set_xlabel("Reef parallel")
     ax.set_ylabel("Reef perpendicular")
     ax.set_zlabel("Depth")
-    # ax.set_xlim(min(np.asarray(pcd.points)[:, 0]) * scale, max(np.asarray(pcd.points)[:, 0]) * scale)
-    # ax.set_ylim(min(np.asarray(pcd.points)[:, 1]) * scale, max(np.asarray(pcd.points)[:, 1]) * scale)
-    # ax.set_zlim(min(np.asarray(pcd.points)[:, 2]) * scale, max(np.asarray(pcd.points)[:, 2]) * scale)
-    # NEED TO CHOOSE BETTER X AND Y VALUES! Choose based on the inliers
-    # what are two furthest points once rotated
-    x = np.linspace(min(np.asarray(pcd.points)[:, 0]), max(np.asarray(pcd.points)[:, 0]), 10)
-    y = np.linspace(min(np.asarray(pcd.points)[:, 1]), max(np.asarray(pcd.points)[:, 1]), 10)
+    plane_points = np.asarray(pcd.points)[inliers]
+    x = plane_points[:, 0]
+    y = plane_points[:, 1]
     X, Y = np.meshgrid(x, y)
-    Z = plane_model[3] - (plane_model[0] * X + plane_model[1] * Y) / plane_model[2] + z_adjust
+    Z = plane_model[3] - (plane_model[0] * X + plane_model[1] * Y) / plane_model[2] +19.5
     surf = ax.plot_surface(X, Y, Z, alpha=0.5)
     print('Showing points and plane ...')
     plt.show()
@@ -157,7 +189,7 @@ def rotate_based_on_plane(pcd, plane_model):
     return pcd_r
 
 
-def get_rugosity(pcd_r, threeD_area, scale):
+def get_rugosity(pcd_r, threeD_area):
     # project points onto 2D xy axes
     print('Projecting points to xy plane, z=0')
     x = np.asarray(pcd_r.points)[:, 0]
@@ -186,7 +218,7 @@ def get_rugosity(pcd_r, threeD_area, scale):
     alpha_shape = alphashape.alphashape(points_2d, 2.0)
     ax.add_patch(PolygonPatch(alpha_shape, alpha=0.2))
     plt.show()
-    twoD_area = alpha_shape.area * (scale ** 2)
+    twoD_area = alpha_shape.area
     print('2D area is ...', twoD_area)
 
     # print('Creating polygon for 3D points')
@@ -216,7 +248,7 @@ def get_rugosity(pcd_r, threeD_area, scale):
     return rugosity
 
 
-def main(filename, largest_cluster_mesh, scale):
+def main(filename, largest_cluster_mesh):
     # import point cloud
     pcd = o3d.io.read_point_cloud("{}.ply".format(filename))
 
@@ -234,10 +266,10 @@ def main(filename, largest_cluster_mesh, scale):
     if largest_cluster_mesh == 'Yes':
         large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
         triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
-        threeD_area = cluster_area * (scale ** 2)
+        threeD_area = cluster_area
     else:
         large_mesh = mesh_removed
-        threeD_area = np.sum(cluster_area) * (scale ** 2)
+        threeD_area = np.sum(cluster_area)
         'Print not subsampling to largest mesh'
 
     print('Cluster area is ... {} m^2'.format(threeD_area))
@@ -248,34 +280,48 @@ def main(filename, largest_cluster_mesh, scale):
     pcd = large_mesh.sample_points_poisson_disk(number_of_points=500, pcl=pcd)
     o3d.visualization.draw_geometries([pcd])
 
+    plot_colony(pcd)
+
     # Fit a linear model
     print('Fitting a linear model')
-    theta_xz = fit_a_lm(pcd, axes_order=[0, 2])
-    psi_yz = fit_a_lm(pcd, axes_order=[1, 2])
+    theta_xz = fit_a_lm(pcd, axes_order=[0, 2, 1])
+    psi_yz = fit_a_lm(pcd, axes_order=[1, 2, 0])
     theta_radians = theta_xz / (180 * np.pi)
     psi_radians = psi_yz / (180 * np.pi)
     # TODO: figure out why xz angle so different for KP0479_AC_WP20
 
     # Rotate points based on linear model angles
-    R = pcd.get_rotation_matrix_from_xyz((psi_radians, theta_radians, 0))
-    pcd_r = copy.deepcopy(pcd)
-    pcd_r.rotate(R, center=(0, 0, 0))
+    #R = pcd.get_rotation_matrix_from_xyz((psi_radians, theta_radians, 0))
+    #pcd_r = copy.deepcopy(pcd)
+    #pcd_r.rotate(R, center=(0, 0, 0))  # CANT USE THIS METHOD AS AXES IS NOT AT THE ORIGIN
+    #plot_colony(pcd_r)
+    #plot_colony(pcd)
 
     # Fit a plane to point cloud
-    # print('Fitting a plane')
+    print('Fitting a plane')
 
-    # plane_model, inliers = fit_a_plane_ransac(pcd)
-    # display_inlier_outlier(pcd, inliers)
+    plane_model, inliers = fit_a_plane_ransac(pcd)
+    display_inlier_outlier(pcd, inliers)
 
     # plot plane & point
-    # plot_plane(pcd, plane_model, z_adjust=0.40)
+    plot_plane(pcd, plane_model, inliers)
 
     # rotate points
     # pcd_r = rotate_based_on_plane(pcd, plane_model)
     # plot_plane(pcd_r, plane_model, z_adjust=-0.97)  # trial and error with this!
 
     # Rugosity
-    rugosity = get_rugosity(pcd_r, threeD_area, scale)
+    rugosity = get_rugosity(pcd_r, threeD_area)
+
+    # Try taking an image
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(visible=True)  # works for me with False, on some systems needs to be true
+    vis.add_geometry(large_mesh)
+    vis.update_geometry(large_mesh)
+    vis.poll_events()
+    vis.update_renderer()
+    vis.capture_screen_image('{}.png'.format(filename))
+    vis.destroy_window()
 
     # mesh cone to use for caclulating overhang
     # o3d.geometry.create_mesh_cone(radius=1.0, height=2.0, resolution=20, split=1)
@@ -297,9 +343,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog="Colony clean and measure")
     parser.add_argument('filename')  # e.g., KP0287_LM_WP20
     parser.add_argument('largest_cluster_mesh')  # e.g., Yes or No
-    parser.add_argument('scale', type=float)
-    args = parser.parse_args()
-    filename = args.filename
-    largest_cluster_mesh = args.largest_cluster_mesh
-    scale = args.scale
-    main(filename, largest_cluster_mesh, scale)
+    #args = parser.parse_args()
+    filename = 'results/KP0287_LM_WP20'#args.filename
+    largest_cluster_mesh = 'Yes'#args.largest_cluster_mesh
+    main(filename, largest_cluster_mesh)
