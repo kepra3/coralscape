@@ -212,11 +212,10 @@ def display_inlier_outlier(cloud, ind):
 
 
 def get_cluster_triangles(mesh):
-    print("Cluster connected triangles")
+    print("Clustering connected triangles ...")
     with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
         triangle_clusters, cluster_n_triangles, cluster_area = (mesh.cluster_connected_triangles())
     triangle_clusters = np.asarray(triangle_clusters)
-    print(triangle_clusters)
     cluster_n_triangles = np.asarray(cluster_n_triangles)
     cluster_area = np.asarray(cluster_area)
     return triangle_clusters, cluster_n_triangles, cluster_area
@@ -243,32 +242,49 @@ def fit_a_lm(pcd, axes_order):
     # Choose points
     axes_one = np.asarray(pcd.points)[:, axes_order[0]].reshape(-1, 1)
     axes_two = np.asarray(pcd.points)[:, axes_order[1]]
-
     # Fit a line
     model = LinearRegression().fit(axes_one, axes_two)
     r_sq = model.score(axes_one, axes_two)
     print('R squared is ...', r_sq)
-
     # Calculate residuals of the model
     axes_two_prediction = (model.intercept_ + model.coef_ * axes_one).reshape(-1, 1)
-
     # Calculate theta
     axes_one_diff = abs(axes_one[1] - axes_one[0])
     axes_two_diff = abs(axes_two_prediction[1] - axes_two_prediction[0])
     theta = np.arctan(axes_two_diff / axes_one_diff) * 180 / np.pi
-    print('Theta is ...', theta)
+    print('Lm angle is ...', theta)
     return theta.__float__()
 
 
-def calc_plane_angles(pcd, plane_model):
+def calc_plane_angles(plane_model):
     # using the formula
     # plane_normal dot axis of interest normal / (magnitude of plane normal * magnitude of axis of interest normal)
     # which simplifies to
-    psi = np.arccos(plane_model[0] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2) ** 0.5)
-    print('The angle between y and z is ...', psi * 180 / np.pi)  # about x-axis (yz)
-    theta = np.arccos(plane_model[1] / (plane_model[0] ** 2 + plane_model[1] ** 2 + plane_model[2] ** 2) ** 0.5)
-    print('The angle between x and z is ...', theta * 180 / np.pi)  # about y-axis (xz)
-    return theta, psi
+    #xz_normal = [0, 1, 0] have to figure out why these don't make sense
+    #yz_normal = [1, 0, 0]
+    plane_normal = [plane_model[0], plane_model[1], plane_model[2]]
+    #mag_xz = np.linalg.norm(xz_normal)
+    #mag_yz = np.linalg.norm(yz_normal)
+    #mag_plane = np.linalg.norm(plane_normal)
+    #cos_theta = np.dot(xz_normal, plane_normal)/(mag_xz*mag_plane)
+    #cos_psi = np.dot(yz_normal, plane_normal)/(mag_yz*mag_plane)
+    #theta = np.arccos(cos_theta) * 180./np.pi
+    slope_xz = plane_normal[0] / plane_normal[2]
+    slope_yz = plane_normal[1] / plane_normal[2]
+    theta = np.arctan(slope_xz) * 180 / np.pi
+    if theta > 90:
+        theta = 180 - theta
+    else:
+        theta = theta
+    print('The angle between x and z is ...', theta)  # about y-axis (xz)
+    #psi = np.arccos(cos_psi) * 180./np.pi
+    psi = np.arctan(slope_yz) * 180 / np.pi
+    if psi > 90:
+        psi = 180 - 90
+    else:
+        psi = psi
+    print('The angle between y and z is ...', psi)  # about x-axis (yz)
+    return theta.__float__(), psi.__float__()
 
 
 def calc_rugosity(pcd_r, threeD_area):
@@ -291,85 +307,135 @@ def calc_rugosity(pcd_r, threeD_area):
     return rugosity
 
 
-def calc_colony_metrics(colonies):
-    colony_angles = {}
-    colony_rugosity = {}
-    for name in colonies:
-        mesh = create_mesh_ball_pivot(colonies[name])
-        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
-        large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
-        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
-        threeD_area = cluster_area
-        print('Cluster area is ... {} m^2 for {}'.format(threeD_area, name))
-        print('Sampling points from mesh first uniformaly then with poisson ...')
-        colony_pcd = large_mesh.sample_points_uniformly(number_of_points=2500)
-        colony_pcd = large_mesh.sample_points_poisson_disk(number_of_points=500, pcl=colony_pcd)
-        print('Fitting a plane with RAMSAC to get colony angles')
-        plane_model, inliers = fit_a_plane_ransac(colony_pcd)
-        theta_plane_xz, psi_plane_yz = calc_plane_angles(colony_pcd, plane_model)
-        colony_angles[name] = [theta_plane_xz, psi_plane_yz]
-        print('Fitting a linear model to correct for colony slope')
-        theta_xz = fit_a_lm(colony_pcd, axes_order=[0, 2])
-        psi_yz = fit_a_lm(colony_pcd, axes_order=[1, 2])
-        theta_radians = theta_xz / (180 * np.pi)
-        psi_radians = psi_yz / (180 * np.pi)
-        lm_R = colony_pcd.get_rotation_matrix_from_xyz((psi_radians, theta_radians, 0))
-        colony_pcd.rotate(lm_R, center=(0, 0, 0))
-        rugosity = calc_rugosity(colony_pcd, threeD_area)
-        colony_rugosity[name] = rugosity
-    return colony_angles, colony_rugosity
+def calc_overhang(colony_pcd, pcd_env):
+    dists = pcd_env.compute_point_cloud_distance(colony_pcd)
+    dists = np.asarray(dists)
+    ind = np.where(dists < 0.01)[0]
+    np.asarray(pcd_env.colors)[ind] = [0, 0, 1]
+    colony = np.asarray(pcd_env.points)[ind]
+    env = np.asarray(pcd_env.points)
+    q = []
+    for i in range(0, len(colony)):
+        p = np.where((env[:, 0] < colony[i, 0] + 0.01) & (env[:, 0] > colony[i, 0] - 0.01) &
+                     (env[:, 1] < colony[i, 1] + 0.01) & (env[:, 1] > colony[i, 1] - 0.01) &
+                     (env[:, 2] > max(colony[:, 2])))
+        if p[0].size:
+            np.asarray(pcd_env.colors)[p[0]] = [1, 0, 0]
+            if len(p[0]) > 1:
+                for j in range(0, len(p)):
+                    p_int = int(p[0][j])
+                    q.append(p_int)
+            elif len(p[0]) == 1:
+                p_int = int(p[0])
+                q.append(p_int)
+    unique_q = list()
+    unique_points = 0
+    for item in q:
+        if item not in unique_q:
+            unique_q.append(item)
+            unique_points += 1
+    if colony.size:
+        overhang_prop = unique_points / len(colony)  # proportion works for now but area would be better
+    else:
+        print('issue with colony points ...')
+        overhang_prop = None
+    return overhang_prop
 
 
-def calc_outcrop_proportion(colonies, environment):
-    """ Calculate the proportion the colony sits at in an environment """
-    heights = {}
-    all_relative_heights = {}
-
-    for name in colonies:
-        sample = np.asarray(colonies[name].points)
-        if len(sample) <= 3:
-            continue
-        colony_mean_height = np.mean(sample[:, 2])
-        heights[name] = colony_mean_height
-
-        # Extract points
-        environment_array = np.asarray(environment[name].points)
-        env_min_height = min(environment_array[:, 2])
-        env_max_height = max(environment_array[:, 2])
-        env_height_range = env_max_height - env_min_height
-
-        # Proportion
-        all_relative_heights[name] = (colony_mean_height - env_min_height) / env_height_range
-
-    return all_relative_heights
-
-
-def calc_environment_rugosity(environment):
+def calc_metrics(colonies, environment):
+    colonies_theta_xz = {}
+    colonies_psi_yz = {}
+    colonies_rugosity = {}
+    overhang_prop = {}
+    outcrop_prop = {}
+    colonies_height = {}
     environment_rugosity = {}
-    for name in environment:
-        mesh = create_mesh_ball_pivot(environment[name])
-        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
-        threeD_area = np.sum(cluster_area)
-        print('Cluster area is ... {} m^2 for {}'.format(threeD_area, name))
-        print('Sampling points from mesh first uniformaly then with poisson ...')
-        environment_pcd = mesh.sample_points_uniformly(number_of_points=2500)
-        environment_pcd = mesh.sample_points_poisson_disk(number_of_points=500, pcl=environment_pcd)
-        print('Fitting a linear model to correct for environment slope')
-        theta_xz = fit_a_lm(environment_pcd, axes_order=[0, 2])
-        psi_yz = fit_a_lm(environment_pcd, axes_order=[1, 2])
-        theta_radians = theta_xz / (180 * np.pi)
-        psi_radians = psi_yz / (180 * np.pi)
-        lm_R = environment_pcd.get_rotation_matrix_from_xyz((psi_radians, theta_radians, 0))
-        environment_pcd.rotate(lm_R, center=(0, 0, 0))
-        rugosity = calc_rugosity(environment_pcd, threeD_area)
-        environment_rugosity[name] = rugosity
-    return environment_rugosity
+
+    for name in colonies:
+        if len(np.asarray(colonies[name].points)) <= 3:
+            print('Not including {} because < 3 points')
+            continue
+        else:
+            print('\n\n\n ***** Starting new colony ...', name, '******')
+            print('Getting colony angles ...')
+            mesh = create_mesh_ball_pivot(colonies[name])
+            triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
+            large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
+            triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
+            # TODO: NEED TO FILL HOLES IN MESH!
+            threeD_area = cluster_area
+            #vis = o3d.visualization.Visualizer()
+            #vis.create_window(visible=True)  # works for me with False, on some systems needs to be true
+            #vis.add_geometry(large_mesh)
+            #vis.update_geometry(large_mesh)
+            #vis.poll_events()
+            #vis.update_renderer()
+            #vis.capture_screen_image('{}.png'.format(name))
+            #vis.destroy_window()
+            print('Cluster area is ... {} m^2 for {}'.format(threeD_area, name))  # TODO: should output this
+            print('Sampling points from mesh first uniformaly then with poisson ...')
+            colony_pcd = large_mesh.sample_points_uniformly(number_of_points=len(np.asarray(colonies[name].points)))
+            colony_pcd = large_mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(colonies[name].points)),
+                                                               pcl=colony_pcd)
+            # NEED TO FILL MESH HOLES
+            print('Fitting a plane with RAMSAC to get colony angles')
+            plane_model, inliers = fit_a_plane_ransac(colony_pcd)
+            colony_theta_xz, colony_psi_yz = calc_plane_angles(plane_model)
+            colonies_theta_xz[name] = abs(colony_theta_xz)
+            colonies_psi_yz[name] = abs(colony_psi_yz)
+            # RUGOSITY
+            print('Getting colony rugosity ...')
+            print('Rotate colony points according to colony slope')
+            colony_psi_radians = colony_psi_yz / 180. * np.pi
+            colony_theta_radians = colony_theta_xz / 180. * np.pi
+            colony_R = colony_pcd.get_rotation_matrix_from_xyz((colony_psi_radians, colony_theta_radians, 0))
+            colony_pcd_R = copy.deepcopy(colony_pcd)
+            colony_pcd_R.rotate(colony_R, center=(0, 0, 0))
+            rugosity = calc_rugosity(colony_pcd_R, threeD_area)
+            colonies_rugosity[name] = rugosity
+            # OVERHANG_PROP
+            print('Getting overhang proportion ...')
+            overhang_prop[name] = calc_overhang(colony_pcd, environment[name])
+            print('Overhang proportion is ...', overhang_prop[name])
+            # OUTCROP_PROP
+            print('Getting outcrop proportion ...')
+            sample = np.asarray(colonies[name].points)
+            if len(sample) <= 3:
+                continue
+            colony_mean_height = np.mean(sample[:, 2])
+            colonies_height[name] = colony_mean_height
+            environment_array = np.asarray(environment[name].points)
+            env_min_height = min(environment_array[:, 2])
+            env_max_height = max(environment_array[:, 2])
+            env_height_range = env_max_height - env_min_height
+            outcrop_prop[name] = (colony_mean_height - env_min_height) / env_height_range
+            print('Outcrop proportion is ...', outcrop_prop[name])
+            # ENV RUGOSITY
+            print('Getting environment rugosity ...')
+            mesh = create_mesh_ball_pivot(environment[name])
+            triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
+            threeD_area = np.sum(cluster_area)
+            print('Cluster area is ... {} m^2 for {}'.format(threeD_area, name))
+            print('Sampling points from mesh first uniformaly then with poisson ...')
+            environment_pcd = mesh.sample_points_uniformly(number_of_points=len(np.asarray(environment[name].points)))
+            environment_pcd = mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(environment[name].points)),
+                                                              pcl=environment_pcd)
+            print('Fit a plane to correct for environment slope')
+            plane_model_env, inliers_env = fit_a_plane_ransac(environment_pcd)
+            env_theta_xz, env_psi_yz = calc_plane_angles(plane_model_env)
+            env_theta_radians = env_theta_xz / (180 * np.pi)
+            env_psi_radians = env_psi_yz / (180 * np.pi)
+            env_R = environment_pcd.get_rotation_matrix_from_xyz((env_psi_radians, env_theta_radians, 0))
+            environment_pcd.rotate(env_R, center=(0, 0, 0))
+            rugosity = calc_rugosity(environment_pcd, threeD_area)
+            environment_rugosity[name] = rugosity
+    return colonies_theta_xz, colonies_psi_yz, colonies_rugosity, overhang_prop, outcrop_prop, environment_rugosity
 
 
 def main(ply_filename, annotations_filename, subsets_filename):
-    #### 1. PREPARATION SUBSET COLONY POINTS AND SCALE & ROTATE ALL POINTS ####
+    # 1. PREPARATION SUBSET COLONY POINTS AND SCALE & ROTATE ALL POINTS ####
     short_name = "_".join(ply_filename.split('_')[0:4])
-    print('Reading PLY file ...')
+    print('Reading PLY file {} ...'.format(ply_filename))
     pcd = o3d.io.read_point_cloud('{}/{}'.format(PATH, ply_filename))
     print('Read viscore metadata file ...')
     viscore_md = Viscore_metadata(subsets_filename, short_name)
@@ -394,39 +460,35 @@ def main(ply_filename, annotations_filename, subsets_filename):
     print('Building KDTree ...')
     pcd_tree_r = o3d.geometry.KDTreeFlann(pcd_r)
 
-    # GET COLONIES AND ENV
-    print("Searching for colony around annotations ...")
+    #print('Get angles of construct, i.e., ground slope')
+    #plane_model, inliers = fit_a_plane_ransac(pcd_r)
+    #theta_xz, psi_yz = calc_plane_angles(plane_model)
+    #o3d.visualization.draw_geometries([pcd_r])
+
+    # 2. FIND COLONIES AND ENV ####
+    print("\nSearching for colony around annotations ...")
     colonies = get_neighbourhood(rotated_scaled_annotations, pcd_r, pcd_tree_r, ranges)
-
-    double_range = {}
+    env_range = {}
     for name in ranges:
-        double_range[name] = ranges[name] * 2
-        print('double range is:', double_range[name])
-
+        env_range[name] = ranges[name] + 0.4
+        #print('environment range is:', env_range[name])
     print('Getting neighbourhood range')
-    environment = get_neighbourhood(rotated_scaled_annotations, pcd_r, pcd_tree_r, double_range)
+    environment = get_neighbourhood(rotated_scaled_annotations, pcd_r, pcd_tree_r, env_range)
 
-    #### 2. COLONY STATISTICS ####
-    colony_angles, colony_rugosity = calc_colony_metrics(colonies)
+    # 3. STATISTICS ####
+    colony_theta_xz, colony_psi_yz, colony_rugosity, \
+    overhang_prop, outcrop_prop, environment_rugosity = calc_metrics(colonies, environment)
     # TODO: rugosity sometimes high (5) check for specific colonies
-
-    ### 3. ENVIRONMENT STATISTICS ####
-    # Define neighbourhood range
-
-    print('Calculating outcrop proportion ...')
-    outcrop = calc_outcrop_proportion(colonies, environment)
-    print('Calculate environment rugosity ...')
-    environment_rugosity = calc_environment_rugosity(environment)
     # TODO: should I instead calculate rugosity within a square around colony that's not scaled by the colony size?
 
     # 4. SAVE METADATA ####
-    dicts = [colony_angles, colony_rugosity, outcrop, environment_rugosity, ranges]
+    dicts = [colony_theta_xz, colony_psi_yz, colony_rugosity, overhang_prop, outcrop_prop, environment_rugosity, ranges]
     sample_metadata = {}
     for key in dicts[0]:
         sample_metadata[key] = [d[key] for d in dicts]
     # Convert to .csv for input to R
     df = pd.DataFrame(sample_metadata).T
-    df.columns = ['colony_angles', 'colony_rugosity', 'outcrop_prop', 'environment_rugosity', 'range']
+    df.columns = ['colony_theta_xz', 'colony_psi_yz', 'colony_rugosity', 'overhang_prop', 'outcrop_prop', 'environment_rugosity', 'range']
     # Save to file
     df.to_csv('~/git/coralscape/results/sample_metadata_{}.csv'.format(ply_filename))
     print('Saved metadata to file ...')
@@ -451,10 +513,18 @@ def main(ply_filename, annotations_filename, subsets_filename):
 
 
 if __name__ == '__main__':
-    ply_filename = "cur_sna_20m_20200303_decvis_02.ply"
-    annotations_filename = "cur_sna_20m_20190410_decvisann_HI_12_12.txt"
-    subsets_filename = "subsets.json"
-
+    # Arguments
+    parser = argparse.ArgumentParser(prog="Colony clean and measure")
+    parser.add_argument('ply_filename')
+    parser.add_argument('annotations_filename')
+    parser.add_argument('subsets_filename')
+    args = parser.parse_args()
+    #args.ply_filename = "cur_kal_20m_20200214_decvis_02.ply"
+    #args.annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
+    # args.subsets_filename = "subsets.json"
+    ply_filename = args.ply_filename
+    annotations_filename = args.annotations_filename
+    subsets_filename = args.subsets_filename
     # WP05 cur_kal_05m_20200214_decvis_02_KP
     # theta -6.91, psi 21.08
     # WP10 cur_kal_10m_20200214_decvis_02_KP_905
