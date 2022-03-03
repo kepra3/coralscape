@@ -433,6 +433,16 @@ def calc_metrics(colonies, environment):
 
 
 def main(ply_filename, annotations_filename, subsets_filename):
+    # Make a results file as you go through samples
+    #out_name = "struc_complex_results.txt"
+    #with open(out_name, 'a') as results_out:
+    #    if results_out.tell() == 0:
+    #        print('Creating a new file\n')
+    #        results_out.write(
+    #            "sample_name\tcloud_points\tplane_i,\tplane_j\tplane_k\taxis_i1\taxis_j1\taxis_k1\t"
+    #            "axis_i2\taxis_j2\taxis_k2\televation\n")
+    #    else:
+    #        print('File exists, appending\n')
     # 1. PREPARATION SUBSET COLONY POINTS AND SCALE & ROTATE ALL POINTS ####
     short_name = "_".join(ply_filename.split('_')[0:4])
     print('Reading PLY file {} ...'.format(ply_filename))
@@ -497,15 +507,12 @@ def main(ply_filename, annotations_filename, subsets_filename):
     anno_df.columns = ['x', 'y', 'z']
     anno_df.to_csv('~/git/coralscape/results/scaled_annotations_{}.csv'.format(ply_filename))
 
-    #for name in ['KP0287_LM_WP20', 'KP0350_LM_WP20', 'KP0558_LM_WP20',
-    #             'KP0479_AC_WP20', 'KP0490_AC_WP20', 'KP0554_AC_WP20']:
+    #for name in ['KP0294_AC_WP20', 'KP0302_AC_WP20', 'KP0306_LM_WP20', 'KP0477_AC_WP20', 'KP0571_AC_WP20',
+    #             'KP0583_LM_WP20', 'KP0588_LM_WP20', 'KP0573_LM_WP20', 'KP0387_AC_WP20', 'KP0518_LM_WP20']:
     #    colony_env = environment[name]
     #    print(colony_env)
     #    print(type(colony_env))
     #    o3d.io.write_point_cloud('{}_env.ply'.format(name), colony_env)  # should save normals & rgb
-
-    #for name in ['KP0287_LM_WP20', 'KP0350_LM_WP20', 'KP0558_LM_WP20',
-    #             'KP0479_AC_WP20', 'KP0490_AC_WP20', 'KP0554_AC_WP20']:
     #    colony_ind = colonies[name]
     #    print(colony_ind)
     #    print(type(colony_ind))
