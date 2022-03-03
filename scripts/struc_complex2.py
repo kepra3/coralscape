@@ -295,16 +295,16 @@ def calc_rugosity(pcd_r, threeD_area):
     print('Creating polygon for 2D points')
     points_2d = np.asarray((x, y)).transpose()
     alpha_shape = alphashape.alphashape(points_2d, 2.0)
-    twoD_area = alpha_shape.area
-    print('2D area is ...', twoD_area)
-    print('Rugosity is', threeD_area / twoD_area)
-    rugosity = threeD_area / twoD_area
+    rotated_twoD_area = alpha_shape.area
+    print('2D area is ...', rotated_twoD_area)
+    print('Rugosity is', threeD_area / rotated_twoD_area)
+    rugosity = threeD_area / rotated_twoD_area
     if rugosity < 1:
-        print("shape complex rugosity likely essentially 1")
+        print("shape not complex rugosity likely essentially 1")
         rugosity = 1
     else:
         pass
-    return rugosity
+    return rugosity, rotated_twoD_area
 
 
 def calc_overhang(colony_pcd, pcd_env):
@@ -373,7 +373,7 @@ def calc_metrics(colonies, environment):
             #vis.capture_screen_image('{}.png'.format(name))
             #vis.destroy_window()
             print('Cluster area is ... {} m^2 for {}'.format(threeD_area, name))  # TODO: should output this
-            print('Sampling points from mesh first uniformaly then with poisson ...')
+            print('Sampling points from mesh first uniformly then with poisson ...')
             colony_pcd = large_mesh.sample_points_uniformly(number_of_points=len(np.asarray(colonies[name].points)))
             colony_pcd = large_mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(colonies[name].points)),
                                                                pcl=colony_pcd)
@@ -433,16 +433,33 @@ def calc_metrics(colonies, environment):
 
 
 def main(ply_filename, annotations_filename, subsets_filename):
-    # Make a results file as you go through samples
-    #out_name = "struc_complex_results.txt"
-    #with open(out_name, 'a') as results_out:
-    #    if results_out.tell() == 0:
-    #        print('Creating a new file\n')
-    #        results_out.write(
-    #            "sample_name\tcloud_points\tplane_i,\tplane_j\tplane_k\taxis_i1\taxis_j1\taxis_k1\t"
-    #            "axis_i2\taxis_j2\taxis_k2\televation\n")
-    #    else:
-    #        print('File exists, appending\n')
+    # Make a result files as you go through samples
+    out_one = "struc_complex_results.txt"
+    with open(out_one, 'a') as results_out:
+        if results_out.tell() == 0:
+            print('Creating a new file\n')
+            results_out.write(
+                "\tplot_name\tsample_name\tcloud_points\tcolony_elevation\tcolony_rugosity\toverhang_prop\toutcrop_prop"
+                "\tenvironment_rugosity\trange\n")
+        else:
+            print('File exists, appending\n')
+    out_two = "colony_angle_rotation_results.txt"
+    with open(out_two, 'a') as results_out:
+        if results_out.tell() == 0:
+            print('Creating a new file\n')
+            results_out.write(
+                "sample_name\tcloud_points\tplane_i,\tplane_j\tplane_k\taxis_i1\taxis_j1\taxis_k1\t"
+                "axis_i2\taxis_j2\taxis_k2\televation\n")
+        else:
+            print('File exists, appending\n')
+    out_three = "colony_area_results.txt"
+    with open(out_three, 'a') as results_out:
+        if results_out.tell() == 0:
+            print('Creating a new file\n')
+            results_out.write(
+                "sample_name\tcloud_points\tthreeD_area\ttwoD_area\n")
+        else:
+            print('File exists, appending\n')
     # 1. PREPARATION SUBSET COLONY POINTS AND SCALE & ROTATE ALL POINTS ####
     short_name = "_".join(ply_filename.split('_')[0:4])
     print('Reading PLY file {} ...'.format(ply_filename))

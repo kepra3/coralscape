@@ -257,7 +257,7 @@ def calc_overhang_mainpy(colony_pcd, pcd_env):
     dists = pcd_env.compute_point_cloud_distance(colony_pcd)
     dists = np.asarray(dists)
     ind = np.where(dists < 0.01)[0]
-    np.asarray(pcd_env.colors)[ind] = [0, 0, 1]
+    np.asarray(pcd_env.colors)[ind] = [0, 0, 1]  # green
     colony = np.asarray(pcd_env.points)[ind]
     env = np.asarray(pcd_env.points)
     q = []
@@ -266,7 +266,7 @@ def calc_overhang_mainpy(colony_pcd, pcd_env):
                      (env[:, 1] < colony[i, 1] + 0.01) & (env[:, 1] > colony[i, 1] - 0.01) &
                      (env[:, 2] > max(colony[:, 2])))
         if p[0].size:
-            np.asarray(pcd_env.colors)[p[0]] = [1, 0, 0]
+            np.asarray(pcd_env.colors)[p[0]] = [1, 0, 0]  # red
             if len(p[0]) > 1:
                 for j in range(0, len(p)):
                     p_int = int(p[0][j])
@@ -274,14 +274,26 @@ def calc_overhang_mainpy(colony_pcd, pcd_env):
             elif len(p[0]) == 1:
                 p_int = int(p[0])
                 q.append(p_int)
-    unique_q = list()
-    unique_points = 0
-    for item in q:
-        if item not in unique_q:
-            unique_q.append(item)
-            unique_points += 1
+    # Calculate area for overhang
+    unique_int = np.unique(q)
+    overhang_x = np.asarray(pcd_env.points)[unique_int, 0]
+    overhang_y = np.asarray(pcd_env.points)[unique_int, 1]
+    overhang = np.asarray((overhang_x, overhang_y)).transpose()
+    alpha_shape_overhang = alphashape.alphashape(overhang, 18.0)
+    twoD_area_overhang = alpha_shape_overhang.area
+    print(twoD_area_overhang)
+    # Calculate area for shadowed colony
+    colony_x = colony[:, 0]
+    colony_y = colony[:, 1]
+    colony_2d = np.asarray((colony_x, colony_y)).transpose()
+    alpha_shape_colony = alphashape.alphashape(colony_2d, 18.0)
+    twoD_area_colony = alpha_shape_colony.area
+    print(twoD_area_colony)
+
+
+
     if colony.size:
-        overhang_prop = unique_points / len(colony)  # proportion works for now but area would be better
+        overhang_prop = overlap_area  # proportion works for now but area would be better
     else:
         print('issue with colony points ...')
         overhang_prop = None
@@ -420,8 +432,8 @@ def main(sample_name, largest_cluster_mesh):
         else:
             print('File exists, appending\n')
     # Import point cloud
-    pcd = o3d.io.read_point_cloud("../colony_point_clouds/{}.ply".format(sample_name))
-    #pcd_env = o3d.io.read_point_cloud("colony_point_clouds/{}_env.ply".format(sample_name))
+    pcd = o3d.io.read_point_cloud("colony_point_clouds/{}.ply".format(sample_name))
+    pcd_env = o3d.io.read_point_cloud("colony_point_clouds/{}_env.ply".format(sample_name))
 
     o3d.visualization.draw_geometries([pcd])
     cloud_points = len(np.asarray(pcd.points))
@@ -453,8 +465,8 @@ def main(sample_name, largest_cluster_mesh):
     o3d.visualization.draw_geometries([pcd])
 
     # overhang
-    # overhang = calc_overhang(pcd, pcd_env)
-    # print(overhang)
+    overhang = calc_overhang(pcd, pcd_env)
+    print(overhang)
 
     #  Fit plane ransac
     plane_model, inliers = fit_a_plane_ransac(pcd)
