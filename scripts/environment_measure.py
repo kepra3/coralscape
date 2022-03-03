@@ -275,28 +275,27 @@ def calc_overhang_mainpy(colony_pcd, pcd_env):
                 p_int = int(p[0])
                 q.append(p_int)
     # Calculate area for overhang
-    unique_int = np.unique(q)
-    overhang_x = np.asarray(pcd_env.points)[unique_int, 0]
-    overhang_y = np.asarray(pcd_env.points)[unique_int, 1]
-    overhang = np.asarray((overhang_x, overhang_y)).transpose()
-    alpha_shape_overhang = alphashape.alphashape(overhang, 18.0)
-    twoD_area_overhang = alpha_shape_overhang.area
-    print(twoD_area_overhang)
-    # Calculate area for shadowed colony
-    colony_x = colony[:, 0]
-    colony_y = colony[:, 1]
-    colony_2d = np.asarray((colony_x, colony_y)).transpose()
-    alpha_shape_colony = alphashape.alphashape(colony_2d, 18.0)
-    twoD_area_colony = alpha_shape_colony.area
-    print(twoD_area_colony)
-
-
-
-    if colony.size:
-        overhang_prop = overlap_area  # proportion works for now but area would be better
+    if len(q) > 0:
+        unique_int = np.unique(q)
+        overhang_x = np.asarray(pcd_env.points)[unique_int, 0]
+        overhang_y = np.asarray(pcd_env.points)[unique_int, 1]
+        overhang = np.asarray((overhang_x, overhang_y)).transpose()
+        alpha_shape_overhang = alphashape.alphashape(overhang, 25.0)
+        twoD_area_overhang = alpha_shape_overhang.area
+        if colony.size:
+            # Calculate area for shadowed colony
+            colony_x = colony[:, 0]
+            colony_y = colony[:, 1]
+            colony_2d = np.asarray((colony_x, colony_y)).transpose()
+            alpha_shape_colony = alphashape.alphashape(colony_2d, 18.0)
+            twoD_area_colony = alpha_shape_colony.area
+            overhang_prop = twoD_area_overhang / twoD_area_colony
+        else:
+            print('issue with colony points ...')
+            overhang_prop = None
     else:
-        print('issue with colony points ...')
-        overhang_prop = None
+        print('No overhang')
+        overhang_prop = 0.
     return overhang_prop
 
 
@@ -465,7 +464,7 @@ def main(sample_name, largest_cluster_mesh):
     o3d.visualization.draw_geometries([pcd])
 
     # overhang
-    overhang = calc_overhang(pcd, pcd_env)
+    overhang = calc_overhang_mainpy(pcd, pcd_env)
     print(overhang)
 
     #  Fit plane ransac
