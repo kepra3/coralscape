@@ -123,35 +123,35 @@ def calc_plane_angles(plane_model):
     # using the formula
     # plane_normal dot axis of interest normal / (magnitude of plane normal * magnitude of axis of interest normal)
     # which simplifies to
-    #xz_normal = [0, 1, 0] have to figure out why these don't make sense
-    #yz_normal = [1, 0, 0]
+    # xz_normal = [0, 1, 0] have to figure out why these don't make sense
+    # yz_normal = [1, 0, 0]
     plane_normal = [plane_model[0], plane_model[1], plane_model[2]]
-    #mag_xz = np.linalg.norm(xz_normal)
-    #mag_yz = np.linalg.norm(yz_normal)
-    #mag_plane = np.linalg.norm(plane_normal)
-    #cos_theta = np.dot(xz_normal, plane_normal)/(mag_xz*mag_plane)
-    #cos_psi = np.dot(yz_normal, plane_normal)/(mag_yz*mag_plane)
-    #theta = np.arccos(cos_theta) * 180./np.pi
+    # mag_xz = np.linalg.norm(xz_normal)
+    # mag_yz = np.linalg.norm(yz_normal)
+    # mag_plane = np.linalg.norm(plane_normal)
+    # cos_theta = np.dot(xz_normal, plane_normal)/(mag_xz*mag_plane)
+    # cos_psi = np.dot(yz_normal, plane_normal)/(mag_yz*mag_plane)
+    # theta = np.arccos(cos_theta) * 180./np.pi
     slope_xz = plane_normal[0] / plane_normal[2]
     slope_yz = plane_normal[1] / plane_normal[2]
     theta = np.arctan(slope_xz) * 180 / np.pi
-    #if theta > 90:
+    # if theta > 90:
     #    theta = 180 - theta
-    #else:
+    # else:
     #    theta = theta
     print('The angle between x and z is ...', theta)  # about y-axis (xz)
-    #psi = np.arccos(cos_psi) * 180./np.pi
+    # psi = np.arccos(cos_psi) * 180./np.pi
     psi = np.arctan(slope_yz) * 180 / np.pi
-    #if psi > 90:
+    # if psi > 90:
     #    psi = 180 - 90
-    #else:
+    # else:
     #    psi = psi
     print('The angle between y and z is ...', psi)  # about x-axis (yz)
     # the angle between the x-y plane... i.e., the elevation
     xy_normal = [0, 0, 1]
     mag_xy = np.linalg.norm(xy_normal)
     mag_plane = np.linalg.norm(plane_normal)
-    cos_elevation = np.dot(xy_normal, plane_normal)/(mag_xy*mag_plane)
+    cos_elevation = np.dot(xy_normal, plane_normal) / (mag_xy * mag_plane)
     elevation = np.arccos(cos_elevation) * 180 / np.pi
     print('the angle between plane and x-y plane is ...', elevation)
     return theta.__float__(), psi.__float__(), elevation
@@ -249,7 +249,7 @@ def calc_overhang(pcd, pcd_env):
             unique_points += 1
     print(unique_q)
 
-    overhang_prop = unique_points/len(colony)  # proportion works for now but area would be better
+    overhang_prop = unique_points / len(colony)  # proportion works for now but area would be better
     return overhang_prop
 
 
@@ -321,7 +321,8 @@ def calc_environment_rugosity(environment):
         print('Cluster area is ... {} m^2 for {}'.format(threeD_area, name))
         print('Sampling points from mesh first uniformaly then with poisson ...')
         environment_pcd = mesh.sample_points_uniformly(number_of_points=len(np.asarray(environment[name].points)))
-        environment_pcd = mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(environment[name].points)), pcl=environment_pcd)
+        environment_pcd = mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(environment[name].points)),
+                                                          pcl=environment_pcd)
         print('Fitting a plane to correct for environment slope')
         plane_model_env, inliers_env = fit_a_plane_ransac(environment_pcd)
         env_theta_xz, env_psi_yz = calc_plane_angles(plane_model_env)
@@ -339,17 +340,17 @@ def plot_plane(pcd, plane_model, inliers, z_adjust):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(xs=np.asarray(pcd.points)[:, 0],
-                        ys=np.asarray(pcd.points)[:, 1],
-                        zs=np.asarray(pcd.points)[:, 2],
-                        c='red')
+               ys=np.asarray(pcd.points)[:, 1],
+               zs=np.asarray(pcd.points)[:, 2],
+               c='red')
     ax.set_xlabel("Reef parallel")
     ax.set_ylabel("Reef perpendicular")
     ax.set_zlabel("Depth")
-    #ax.scatter(xs=np.asarray(pcd_r.points)[:, 0],
+    # ax.scatter(xs=np.asarray(pcd_r.points)[:, 0],
     #           ys=np.asarray(pcd_r.points)[:, 1],
     #           zs=np.asarray(pcd_r.points)[:, 2],
     #           c='green')
-    #ax.scatter(xs=np.asarray(pcd_c.points)[:, 0],
+    # ax.scatter(xs=np.asarray(pcd_c.points)[:, 0],
     #           ys=np.asarray(pcd_c.points)[:, 1],
     #           zs=np.asarray(pcd_c.points)[:, 2],
     #           c='blue')
@@ -363,41 +364,75 @@ def plot_plane(pcd, plane_model, inliers, z_adjust):
     plt.show()
 
 
-def plot_points_together(pcd, pcd_r):
+def plot_points_together(pcd, pcd_r, sample_name, number):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(xs=np.asarray(pcd.points)[:, 0],
-                        ys=np.asarray(pcd.points)[:, 1],
-                        zs=np.asarray(pcd.points)[:, 2],
-                        c='red')
+               ys=np.asarray(pcd.points)[:, 1],
+               zs=np.asarray(pcd.points)[:, 2],
+               c='red')
     ax.set_xlabel("Reef parallel")
     ax.set_ylabel("Reef perpendicular")
     ax.set_zlabel("Depth")
+    ax.set_title(sample_name)
     ax.scatter(xs=np.asarray(pcd_r.points)[:, 0],
                ys=np.asarray(pcd_r.points)[:, 1],
                zs=np.asarray(pcd_r.points)[:, 2],
                c='green')
-    #ax.scatter(xs=np.asarray(pcd_c.points)[:, 0],
+    # ax.scatter(xs=np.asarray(pcd_c.points)[:, 0],
     #           ys=np.asarray(pcd_c.points)[:, 1],
     #           zs=np.asarray(pcd_c.points)[:, 2],
     #           c='blue')
-    plt.show()
+    plt.savefig('../colony_point_clouds/colony_pics/{}_{}_rotated.png'.format(sample_name, number))
 
 
-def main(filename, largest_cluster_mesh):
-    # import point cloud
-    pcd = o3d.io.read_point_cloud("{}.ply".format(filename))
-    pcd_env = o3d.io.read_point_cloud("{}_env.ply".format(filename))
+def plot_points_together_colours(pcd, pcd_r, sample_name, number):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(xs=np.asarray(pcd.points)[:, 0],
+               ys=np.asarray(pcd.points)[:, 1],
+               zs=np.asarray(pcd.points)[:, 2],
+               c=np.asarray(pcd.colors))
+    ax.set_xlabel("Reef parallel")
+    ax.set_ylabel("Reef perpendicular")
+    ax.set_zlabel("Depth")
+    ax.set_title(sample_name)
+    ax.scatter(xs=np.asarray(pcd_r.points)[:, 0],
+               ys=np.asarray(pcd_r.points)[:, 1],
+               zs=np.asarray(pcd_r.points)[:, 2],
+               c=np.asarray(pcd_r.colors))
+    # ax.scatter(xs=np.asarray(pcd_c.points)[:, 0],
+    #           ys=np.asarray(pcd_c.points)[:, 1],
+    #           zs=np.asarray(pcd_c.points)[:, 2],
+    #           c='blue')
+    plt.savefig('../colony_point_clouds/colony_pics/{}_{}_colour.png'.format(sample_name, number))
+
+
+def main(sample_name, largest_cluster_mesh):
+    # Make results file or append ot it
+    out_name = "../colony_point_clouds/results.txt"
+    with open(out_name, 'a') as results_out:
+        if results_out.tell() == 0:
+            print('Creating a new file\n')
+            results_out.write(
+                "sample_name\tcloud_points\tplane_i,\tplane_j\tplane_k\taxis_i1\taxis_j1\taxis_k1\t"
+                "axis_i2\taxis_j2\taxis_k2\televation\n")
+        else:
+            print('File exists, appending\n')
+    # Import point cloud
+    pcd = o3d.io.read_point_cloud("../colony_point_clouds/{}.ply".format(sample_name))
+    #pcd_env = o3d.io.read_point_cloud("colony_point_clouds/{}_env.ply".format(sample_name))
 
     o3d.visualization.draw_geometries([pcd])
-    o3d.visualization.draw_geometries([pcd_env])
+    cloud_points = len(np.asarray(pcd.points))
+    #o3d.visualization.draw_geometries([pcd_env])
     # Remove outlier points
-    #ind = remove_outlier_points(pcd_env)
-    #display_inlier_outlier(pcd_env, ind)  # may need to do this
+    # ind = remove_outlier_points(pcd_env)
+    # display_inlier_outlier(pcd_env, ind)  # may need to do this
 
     # Create mesh
     mesh = create_mesh_ball_pivot(pcd)
-    #o3d.visualization.draw_ geometries([mesh])  # need to clean points before meshing in some cases maybe
+    # o3d.visualization.draw_ geometries([mesh])  # need to clean points before meshing in some cases maybe
     triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
     mesh_removed = remove_small_clusters(mesh, cluster_n_triangles, triangle_clusters, threshold=5)
     if largest_cluster_mesh == 'Yes':
@@ -418,27 +453,45 @@ def main(filename, largest_cluster_mesh):
     o3d.visualization.draw_geometries([pcd])
 
     # overhang
-    #overhang = calc_overhang(pcd, pcd_env)
-    #print(overhang)
+    # overhang = calc_overhang(pcd, pcd_env)
+    # print(overhang)
 
-    #  rugosity
+    #  Fit plane ransac
     plane_model, inliers = fit_a_plane_ransac(pcd)
     theta, psi, elevation = calc_plane_angles(plane_model)
     theta_radians = theta / 180 * np.pi
     psi_radians = psi / 180 * np.pi
     plot_plane(pcd, plane_model, inliers, -20.75)
     center = pcd.get_center()
-    pcd_r = copy.deepcopy(pcd)
+    pcd_r1 = copy.deepcopy(pcd)
+    pcd_r2 = copy.deepcopy(pcd)
+    pcd_r3 = copy.deepcopy(pcd)
     n_z = [0, 0, 1]  # xy plane normal
     n_p = [plane_model[0], plane_model[1], plane_model[2]]  # plane normal
     # get the axis of rotation vector through the cross product
-    axis_R = np.cross(n_z, n_p)
-    R = pcd.get_rotation_matrix_from_axis_angle(-axis_R)
-    pcd_r.rotate(R, center=center)
-    #pcd_c = copy.deepcopy(pcd)
-    #pcd_c.rotate(R, center=(0, 0, 0))
-    plot_points_together(pcd, pcd_r)
-    print('plane model', plane_model, '\naxis of rotation', axis_R, '\nangle of elevation', elevation)
+    axis_R1 = np.cross(n_z, n_p)  # n_z pointing finger, n_z middle
+    axis_R2 = np.cross(n_p, n_z)  # n_p pointing finger, n_z middle finger
+    R1 = pcd.get_rotation_matrix_from_axis_angle(axis_R1)
+    R2 = pcd.get_rotation_matrix_from_axis_angle(axis_R2)
+    R3 = pcd.get_rotation_matrix_from_axis_angle(n_z)
+    pcd_r1.rotate(R1, center=center)
+    pcd_r2.rotate(R2, center=center)
+    pcd_r3.rotate(R3, center=center)
+    plot_points_together(pcd, pcd_r1, sample_name, 1)
+    plot_points_together(pcd, pcd_r2, sample_name, 2)
+    plot_points_together(pcd, pcd_r3, sample_name, 3)
+    print('Sample:', sample_name, 'plane model', plane_model, '\naxis of rotation', axis_R1, '\nangle of elevation',
+          elevation)
+    print('axis of rotation two:', axis_R2, '\n')
+    plot_points_together_colours(pcd, pcd_r1, sample_name, 1)
+    plot_points_together_colours(pcd, pcd_r2, sample_name, 2)
+    plot_points_together_colours(pcd, pcd_r3, sample_name, 3)
+    print('Outputting results ... :)')
+    with open(out_name, "a") as results_out:
+        results_out.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}"
+                          "\t{8}\t{9}\t{10}\t{11}\n".format(sample_name, cloud_points, n_p[0], n_p[1], n_p[2],
+                                                            axis_R1[0], axis_R1[1], axis_R1[2], axis_R2[0], axis_R2[1],
+                                                            axis_R2[2], elevation))
 
 
 if __name__ == '__main__':
@@ -449,12 +502,18 @@ if __name__ == '__main__':
     # 554 works well with normals
     # 558
     # Arguments
-    parser = argparse.ArgumentParser(prog="Colony clean and measure")
-    parser.add_argument('filename')  # e.g., KP0287_LM_WP20
-    parser.add_argument('largest_cluster_mesh')  # e.g., Yes or No
-    args = parser.parse_args()
-    #filename = args.filename
-    filename = "results/KP0287_LM_WP20"
+    # parser = argparse.ArgumentParser(prog="Colony clean and measure")
+    # parser.add_argument('filename')  # e.g., KP0287_LM_WP20
+    # parser.add_argument('largest_cluster_mesh')  # e.g., Yes or No
+    # args = parser.parse_args()
+    # filename = args.filename
     largest_cluster_mesh = "Yes"
-    #largest_cluster_mesh = args.largest_cluster_mesh
-    main(filename, largest_cluster_mesh)
+    for sample in ['KP0287_LM_WP20', 'KP0294_AC_WP20', 'KP0302_AC_WP20', 'KP0306_LM_WP20', 'KP0350_LM_WP20',
+                   'KP0387_AC_WP20', 'KP0477_AC_WP20', 'KP0479_AC_WP20', 'KP0490_AC_WP20', 'KP0518_LM_WP20',
+                   'KP0554_AC_WP20', 'KP0558_LM_WP20', 'KP0571_AC_WP20', 'KP0573_LM_WP20', 'KP0583_LM_WP20',
+                   'KP0588_LM_WP20']:
+        sample_name = sample
+
+        main(sample, largest_cluster_mesh)
+    # largest_cluster_mesh = args.largest_cluster_mesh
+
