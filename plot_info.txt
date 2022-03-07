@@ -1,0 +1,2 @@
+plot_name	plot_points	theta_xz	theta_yz	elevation
+cur_kal_20m_20200214_decvis_02.ply	42304801	9.813398248013115	-0.10190182023543665	9.813906903980703

@@ -2,12 +2,6 @@
 # -*- coding: utf-8 -*-
 # remember to edit python environment if required.
 
-"""
-@author: kprata
-@date created: 16/12/21
-@description: TODO
-"""
-
 import sys
 import argparse
 import numpy as np
