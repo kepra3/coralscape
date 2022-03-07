@@ -5,7 +5,7 @@
 """
 @author: kprata
 @date created: 9/2/22
-@description: TODO: plot linear regression against plane regression and PCA plane regression
+@description:
 """
 
 import argparse
@@ -105,6 +105,7 @@ def largest_cluster(mesh, cluster_n_triangles, triangle_clusters):
 
 
 def fit_a_plane_ransac(pcd):
+    #TODO: RAMSA plane regression against PCA plane regression
     plane_model, inliers = pcd.segment_plane(distance_threshold=0.001,
                                              ransac_n=3,
                                              num_iterations=1000)

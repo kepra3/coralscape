@@ -5,7 +5,7 @@
 """
 @author: kprata
 @date created: 24/2/22
-@description: TODO
+@description: Check plane rotations
 """
 
 import numpy as np

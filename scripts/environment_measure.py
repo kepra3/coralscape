@@ -5,7 +5,7 @@
 """
 @author: kprata
 @date created: 21/2/22
-@description: TODO
+@description: Separating environment/colony for checking functions
 """
 
 import argparse
@@ -120,32 +120,12 @@ def fit_a_lm(pcd, axes_order):
 
 
 def calc_plane_angles(plane_model):
-    # using the formula
-    # plane_normal dot axis of interest normal / (magnitude of plane normal * magnitude of axis of interest normal)
-    # which simplifies to
-    # xz_normal = [0, 1, 0] have to figure out why these don't make sense
-    # yz_normal = [1, 0, 0]
     plane_normal = [plane_model[0], plane_model[1], plane_model[2]]
-    # mag_xz = np.linalg.norm(xz_normal)
-    # mag_yz = np.linalg.norm(yz_normal)
-    # mag_plane = np.linalg.norm(plane_normal)
-    # cos_theta = np.dot(xz_normal, plane_normal)/(mag_xz*mag_plane)
-    # cos_psi = np.dot(yz_normal, plane_normal)/(mag_yz*mag_plane)
-    # theta = np.arccos(cos_theta) * 180./np.pi
     slope_xz = plane_normal[0] / plane_normal[2]
     slope_yz = plane_normal[1] / plane_normal[2]
     theta = np.arctan(slope_xz) * 180 / np.pi
-    # if theta > 90:
-    #    theta = 180 - theta
-    # else:
-    #    theta = theta
     print('The angle between x and z is ...', theta)  # about y-axis (xz)
-    # psi = np.arccos(cos_psi) * 180./np.pi
     psi = np.arctan(slope_yz) * 180 / np.pi
-    # if psi > 90:
-    #    psi = 180 - 90
-    # else:
-    #    psi = psi
     print('The angle between y and z is ...', psi)  # about x-axis (yz)
     # the angle between the x-y plane... i.e., the elevation
     xy_normal = [0, 0, 1]
@@ -186,7 +166,7 @@ def calc_rugosity(pcd_r, threeD_area):
     alpha_shape = alphashape.alphashape(points_2d, 2.0)
     ax.add_patch(PolygonPatch(alpha_shape, alpha=0.2))
     plt.show()
-    twoD_area = alpha_shape.area * (scale ** 2)
+    twoD_area = alpha_shape.area
     print('2D area is ...', twoD_area)
 
     # print('Creating polygon for 3D points')
@@ -421,7 +401,7 @@ def plot_points_together_colours(pcd, pcd_r, sample_name, number):
 
 def main(sample_name, largest_cluster_mesh):
     # Make results file or append ot it
-    out_name = "../colony_point_clouds/results.txt"
+    out_name = "colony_point_clouds/results.txt"
     with open(out_name, 'a') as results_out:
         if results_out.tell() == 0:
             print('Creating a new file\n')
@@ -472,25 +452,33 @@ def main(sample_name, largest_cluster_mesh):
     theta, psi, elevation = calc_plane_angles(plane_model)
     theta_radians = theta / 180 * np.pi
     psi_radians = psi / 180 * np.pi
+    elevation_radians = elevation / 180 * np.pi
     plot_plane(pcd, plane_model, inliers, -20.75)
     center = pcd.get_center()
     pcd_r1 = copy.deepcopy(pcd)
     pcd_r2 = copy.deepcopy(pcd)
     pcd_r3 = copy.deepcopy(pcd)
+    pcd_r4 = copy.deepcopy(pcd)
     n_z = [0, 0, 1]  # xy plane normal
     n_p = [plane_model[0], plane_model[1], plane_model[2]]  # plane normal
     # get the axis of rotation vector through the cross product
     axis_R1 = np.cross(n_z, n_p)  # n_z pointing finger, n_z middle
     axis_R2 = np.cross(n_p, n_z)  # n_p pointing finger, n_z middle finger
+    axis_R3 = [theta, theta, 0]
+    axis_R1angle = [-plane_model[0] * elevation_radians, -plane_model[1] * elevation_radians, -plane_model[2] * elevation_radians]
     R1 = pcd.get_rotation_matrix_from_axis_angle(axis_R1)
     R2 = pcd.get_rotation_matrix_from_axis_angle(axis_R2)
-    R3 = pcd.get_rotation_matrix_from_axis_angle(n_z)
+    R3 = pcd.get_rotation_matrix_from_axis_angle(axis_R3)
+    R4 = pcd.get_rotation_matrix_from_axis_angle(axis_R1angle)
+    #R3 = pcd.get_rotation_matrix_from_axis_angle(n_z)
     pcd_r1.rotate(R1, center=center)
     pcd_r2.rotate(R2, center=center)
     pcd_r3.rotate(R3, center=center)
+    pcd_r4.rotate(R4, center=center)
     plot_points_together(pcd, pcd_r1, sample_name, 1)
     plot_points_together(pcd, pcd_r2, sample_name, 2)
     plot_points_together(pcd, pcd_r3, sample_name, 3)
+    plot_points_together(pcd, pcd_r4, sample_name, 4)
     print('Sample:', sample_name, 'plane model', plane_model, '\naxis of rotation', axis_R1, '\nangle of elevation',
           elevation)
     print('axis of rotation two:', axis_R2, '\n')
@@ -525,6 +513,6 @@ if __name__ == '__main__':
                    'KP0588_LM_WP20']:
         sample_name = sample
 
-        main(sample, largest_cluster_mesh)
+        main(sample_name, largest_cluster_mesh)
     # largest_cluster_mesh = args.largest_cluster_mesh
 

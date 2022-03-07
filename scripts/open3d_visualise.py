@@ -5,7 +5,7 @@
 """
 @author: kprata
 @date created: 27/1/22
-@description: TODO
+@description: Script for everyone for visualising plots and points
 """
 import open3d as o3d
 import numpy as np  # very useful package that can basically do everything!
