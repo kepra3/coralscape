@@ -17,14 +17,14 @@ __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/WP05"
+PATH = '/data'
 
 
 class Viscore_metadata(object):
     """ Defining viscore metadata as a class object"""
 
     def __init__(self, subsets_filename, short_name):
-        subsets = json.load(open('{}/{}'.format(PATH, subsets_filename)))
+        subsets = json.load(open("../{}".format(subsets_filename)))
         # Determine json key of primary model
         if '{0}/{0}'.format(short_name) in subsets['d']:
             subsets_ortho = subsets['d']['{0}/{0}'.format(short_name)]['c']['ortho']
@@ -32,6 +32,7 @@ class Viscore_metadata(object):
             subsets_ortho = subsets['d'][short_name]['c']['ortho']
         else:
             print('Model not found in subsets.json!')
+            subsets_ortho = None
         self.dd = subsets_ortho['dd']
         self.scale_factor = subsets_ortho['scale_factor']
         self.r = subsets_ortho['vecs']['r']
@@ -224,7 +225,7 @@ def get_cluster_triangles(mesh):
 
 def largest_cluster(mesh, cluster_n_triangles, triangle_clusters):
     """ Select the largest cluster from a mesh """
-    large_mesh: o3d.cpu.pybind.geometry.TriangleMesh = copy.deepcopy(mesh)
+    large_mesh = copy.deepcopy(mesh)
     largest_cluster_idx = cluster_n_triangles.argmax()
     triangles_to_remove = triangle_clusters != largest_cluster_idx
     large_mesh.remove_triangles_by_mask(triangles_to_remove)
@@ -286,7 +287,6 @@ def calc_rugosity(pcd_r, threeD_area):
     print('Projecting points to xy plane, z=0')
     x = np.asarray(pcd_r.points)[:, 0]
     y = np.asarray(pcd_r.points)[:, 1]
-    z = np.repeat(0, len(np.asarray(pcd_r.points)[:, 1]))
     print('Creating polygon for 2D points')
     points_2d = np.asarray((x, y)).transpose()
     alpha_shape = alphashape.alphashape(points_2d, 2.0)
@@ -346,6 +346,7 @@ def calc_overhang(colony_pcd, pcd_env):
     else:
         print('issue with colony points ...')
         overhang_prop = None
+        twoD_area_colony = None
         twoD_area_overhang = None
 
     return overhang_prop, twoD_area_colony, twoD_area_overhang
@@ -364,7 +365,7 @@ def calc_outcrop(colony_pcd, pcd_env):
     env_height_range = env_max_height - env_min_height
     outcrop_prop = (colony_mean_height - env_min_height) / env_height_range
     return outcrop_prop, colony_mean_height, colony_min_height, colony_max_height, \
-           env_mean_height, env_min_height, env_max_height
+    env_mean_height, env_min_height, env_max_height
 
 
 def main(ply_filename, annotations_filename, subsets_filename):
@@ -436,27 +437,29 @@ def main(ply_filename, annotations_filename, subsets_filename):
 
     # 1. PREPARATION SUBSET COLONY POINTS AND SCALE & ROTATE ALL POINTS ####
     print('Reading PLY file {} ...'.format(ply_filename))
-    pcd = o3d.io.read_point_cloud('{}/{}'.format(PATH, ply_filename))
+    pcd = o3d.io.read_point_cloud('{}/{}/{}'.format(PATH, 'kat_ply', ply_filename))
     print('Read viscore metadata file ...')
     viscore_md = Viscore_metadata(subsets_filename, short_name)
     print('Rotating matrix ...')
     up_vector = viscore_md.dd[0:3]
     R = rotate_matrix(pcd, up_vector)
+    # TODO: save rotations
     pcd_r = copy.deepcopy(pcd)
     pcd_r.rotate(R, center=(0, 0, 0))
     print('Scaling point cloud ...')
     pcd_r.scale(viscore_md.scale_factor, center=(0, 0, 0))
     print('Read assignment file ...')
-    annotations = get_annotations('{}/{}'.format(PATH, annotations_filename))
+    annotations = get_annotations('../{}'.format(annotations_filename))
     print('Rotate and scale annotations ...')
     rotated_annotations = {}
+    rotated_scaled_annotations = {}
     for name in annotations:
         rotated_annotations[name] = np.matmul(R, annotations[name])
         rotated_scaled_annotations = rotated_annotations
         for i in range(3):
             rotated_scaled_annotations[name][i] = rotated_annotations[name][i] * viscore_md.scale_factor
     print('Get scaled ranges for each sample...')
-    ranges = get_ranges('{}/{}'.format(PATH, annotations_filename), annotations, viscore_md.scale_factor)
+    ranges = get_ranges("../{}".format(annotations_filename), annotations, viscore_md.scale_factor)
     print('Building KDTree ...')
     pcd_tree_r = o3d.geometry.KDTreeFlann(pcd_r)
     # Write info about plot
@@ -465,7 +468,7 @@ def main(ply_filename, annotations_filename, subsets_filename):
     theta_xz, psi_yz, elevation = calc_plane_angles(plane_model)
     print('Write plot angles to file')
     with open(plot_info, 'a') as results_out:
-        results_out.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(ply_filename, len(np.asarray(pcd_r.points)),
+        results_out.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(short_name, len(np.asarray(pcd_r.points)),
                                                              theta_xz, psi_yz, elevation))
 
     # 2. FIND COLONIES AND ENV ####
@@ -495,7 +498,7 @@ def main(ply_filename, annotations_filename, subsets_filename):
             vis.update_geometry(large_mesh)
             vis.poll_events()
             vis.update_renderer()
-            vis.capture_screen_image('{}.png'.format(name))
+            vis.capture_screen_image('{}/kat_colony_pics/{}.png'.format(PATH, name))
             vis.destroy_window()
             triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
             colony_threeD_area = cluster_area.__float__()
@@ -567,7 +570,7 @@ def main(ply_filename, annotations_filename, subsets_filename):
             triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
             env_threeD_area = np.sum(cluster_area)
             print('Cluster area is ... {} m^2 for {}'.format(env_threeD_area, name))
-            print('Sampling points from mesh first uniformaly then with poisson ...')
+            print('Sampling points from mesh first uniformly then with poisson ...')
             environment_pcd = mesh.sample_points_uniformly(number_of_points=len(np.asarray(environment[name].points)))
             environment_pcd = mesh.sample_points_poisson_disk(
                 number_of_points=len(np.asarray(environment[name].points)),
@@ -596,9 +599,9 @@ def main(ply_filename, annotations_filename, subsets_filename):
                                                                        environment_rugosity,
                                                                        ranges[name], env_range[name]))
 
-    anno_df = pd.DataFrame(rotated_scaled_annotations).T
-    anno_df.columns = ['x', 'y', 'z']
-    anno_df.to_csv('~/git/coralscape/results/scaled_annotations_{}.csv'.format(ply_filename))
+    annotation_df = pd.DataFrame(rotated_scaled_annotations).T
+    annotation_df.columns = ['x', 'y', 'z']
+    annotation_df.to_csv('../results/scaled_annotations_{}.csv'.format(ply_filename))
 
     # for name in ['KP0294_AC_WP20', 'KP0302_AC_WP20', 'KP0306_LM_WP20', 'KP0477_AC_WP20', 'KP0571_AC_WP20',
     #             'KP0583_LM_WP20', 'KP0588_LM_WP20', 'KP0573_LM_WP20', 'KP0387_AC_WP20', 'KP0518_LM_WP20']:
