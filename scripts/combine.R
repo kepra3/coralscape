@@ -17,7 +17,8 @@ annotations3 <- read.csv("scaled_annotations_cur_kal_20m_20200214_decvis_02.ply.
 annotations4 <- read.csv("scaled_annotations_cur_sna_10m_20200303_decvis_02.ply.csv")
 annotations5 <- read.csv("scaled_annotations_cur_sna_20m_20200303_decvis_02.ply.csv")
 annotations6 <- read.csv("scaled_annotations_cur_sna_05m_20200303_decvis_02.ply.csv")
-annotations <- rbind(annotations1,annotations2, annotations3, annotations4, annotations5, annotations6)
+annotations7 <- read.csv("scaled_annotations_cur_cas_05m_20201212_decvis_02.ply.csv")
+annotations <- rbind(annotations1,annotations2, annotations3, annotations4, annotations5, annotations6, annotations7)
 write.csv(annotations, file = "~/git/coralscape/results/annotations.csv", quote = FALSE, row.names = FALSE)
 
 struc.complex4 <- read.csv("sample_metadata_cur_sna_10m_20200303_decvis_02.ply.csv")
@@ -38,3 +39,7 @@ struc.complex5$colony_rugosity <- gsub("]", "", struc.complex5$colony_rugosity, 
 struc.complex <- rbind(struc.complex3,struc.complex5)
 write.csv(struc.complex, file = "~/git/coralscape/results/sample_metadata_X.csv", quote = FALSE, row.names = FALSE)
 
+struc.complex_WP20 <- read.csv("struc_complex_results_WP20.txt", sep = "\t")
+struc.complex_results <- read.csv("struc_complex_results.txt", sep = "\t")
+struc.complex.X <- rbind(struc.complex_results, struc.complex_WP20)
+write.csv(struc.complex.X, file = "struc_complex_results_X.csv", quote = FALSE, row.names = FALSE)
