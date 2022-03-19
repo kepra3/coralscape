@@ -43,3 +43,24 @@ struc.complex_WP20 <- read.csv("struc_complex_results_WP20.txt", sep = "\t")
 struc.complex_results <- read.csv("struc_complex_results.txt", sep = "\t")
 struc.complex.X <- rbind(struc.complex_results, struc.complex_WP20)
 write.csv(struc.complex.X, file = "struc_complex_results_X.csv", quote = FALSE, row.names = FALSE)
+
+# Cluster file ####
+all.aga <- read.csv("~/Dropbox/agaricia_project_2019/shalo_ag/gen_project/data/all-aga_1d_nc_20_6.csv")
+hu <- read.csv("~/Dropbox/agaricia_project_2019/shalo_ag/gen_project/data/hu_1d_nc_20_4.csv")
+
+order.all.aga <-  all.aga[order(all.aga[,1]),]
+order.hu <- hu[order(hu[,1]),]
+order.all.aga$hu.clust <- NA
+order.all.aga$hu.clust[order.all.aga$Individual %in% order.hu$Individual] <- order.hu$Clusters
+
+for (i in 1:length(order.all.aga[,1])) {
+  if (is.na(order.all.aga$hu.clust[i])) {
+  print('not hu')
+  } else if (order.all.aga$hu.clust[i] == "Clust3") {
+    order.all.aga$Clusters[i] = 7
+    print('changing cluster to 7')
+  } else {
+    print('another cluster')
+  }
+}
+write.csv(order.all.aga[,-20], file = "clusters_updated.csv", quote = FALSE, row.names = FALSE)

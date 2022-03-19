@@ -17,7 +17,7 @@ __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SB20"
+PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SQ20"
 
 
 class Viscore_metadata(object):
@@ -647,5 +647,6 @@ if __name__ == '__main__':
     # CA05 cur_cas_05m_20201212_decvis_02_KP_31-01-22
     # note had to alter subsets.json file to have cur_cas_05m_20201212/cur_cas_05m_20201212
     # theta = 2.86, psi = -0.24
+    # SQ20 cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
 
     main(ply_filename, annotations_filename, subsets_filename)
