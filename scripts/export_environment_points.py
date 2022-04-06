@@ -12,8 +12,6 @@
 import argparse
 import numpy as np
 import open3d as o3d
-import copy
-import json
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 
