@@ -5,14 +5,18 @@
 """
 @author: kprata
 @date created: 6/4/22
-@description: TODO
+@description: Calculates all measures for a single colony.
 """
 
 # Modules
 import argparse
+import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
 import copy
+import alphashape
+from descartes import PolygonPatch
+
 
 def get_annotations(annotations_path):
     """ Read annotations from csv file """
@@ -20,7 +24,7 @@ def get_annotations(annotations_path):
     annotations_file = open(annotations_path, 'r')
     for line in annotations_file:
         cols = line.rstrip().replace(',', ' ').split()
-        if cols[0] == 'x':
+        if cols[1] == 'x':
             continue
         else:
             annotations[cols[0]] = [float(i) for i in cols[1:5]]
@@ -28,19 +32,19 @@ def get_annotations(annotations_path):
     return annotations
 
 
-def get_neighbourhood(annotations, pcd, pcd_tree):
+def get_neighbourhood(annotations, ply_filename, pcd, pcd_tree):
     """ Find neighbouring points """
-    colonies = {}
     print('Searching ...')
-    for name in annotations:
-        [k, idx, _] = pcd_tree.search_radius_vector_3d(annotations[name][0:3],
-                                                       annotations[name][3])
-        # Store colony as separate point cloud with points, normals and colours!!!
-        colonies[name] = o3d.geometry.PointCloud()
-        colonies[name].points = o3d.utility.Vector3dVector(np.asarray(pcd.points)[idx[1:], :])
-        colonies[name].normals = o3d.utility.Vector3dVector(np.asarray(pcd.normals)[idx[1:], :])
-        colonies[name].colors = o3d.utility.Vector3dVector(np.asarray(pcd.colors)[idx[1:], :])
-    return colonies
+    if annotations[ply_filename][3] <= 0.:
+        annotations[ply_filename][3] = 0.01
+    [k, idx, _] = pcd_tree.search_radius_vector_3d(annotations[ply_filename][0:3],
+                                                   annotations[ply_filename][3])
+    # Store colony as separate point cloud with points, normals and colours!!!
+    colony = o3d.geometry.PointCloud()
+    colony.points = o3d.utility.Vector3dVector(np.asarray(pcd.points)[idx[1:], :])
+    colony.normals = o3d.utility.Vector3dVector(np.asarray(pcd.normals)[idx[1:], :])
+    colony.colors = o3d.utility.Vector3dVector(np.asarray(pcd.colors)[idx[1:], :])
+    return colony
 
 
 def create_mesh_ball_pivot(pcd):
@@ -49,10 +53,16 @@ def create_mesh_ball_pivot(pcd):
     distances = pcd.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
     radius = 1.5 * avg_dist
-    radii = []
-    for i in range(1, 10):
-        radii.append(radius * i)
+    radii = [radius]
+    for i in range(0, 9):
+        radii.append(radii[i] * 2)
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcd, o3d.utility.DoubleVector(radii))
+    return mesh
+
+
+def mesh_alpha(pcd, alpha):
+    print(f"alpha={alpha:.3f}")
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, alpha)
     return mesh
 
 
@@ -119,7 +129,7 @@ def calc_plane_angles(plane_model):
     return theta.__float__(), psi.__float__(), elevation.__float__()
 
 
-def calc_rugosity(pcd_r, threeD_area):
+def calc_rugosity(pcd_r, threeD_area, name):
     """ Calculate the rugosity of a point cloud, given the 3D area of the mesh and 2D area created by the
     convex hull (alphashape) """
     print('Projecting points to xy plane, z=0')
@@ -129,6 +139,10 @@ def calc_rugosity(pcd_r, threeD_area):
     print('Creating polygon for 2D points')
     points_2d = np.asarray((x, y)).transpose()
     alpha_shape = alphashape.alphashape(points_2d, 2.0)
+    fig, ax = plt.subplots()
+    ax.scatter(x=points_2d[:, 0], y=points_2d[:, 1])
+    ax.add_patch(PolygonPatch(alpha_shape, alpha=0.2))
+    plt.savefig("{}/results/colony_pics/polygonPatch_{}.png".format(path, name))
     rotated_twoD_area = alpha_shape.area
     print('2D area is ...', rotated_twoD_area)
     rugosity = threeD_area / rotated_twoD_area
@@ -206,15 +220,172 @@ def calc_outcrop(colony_pcd, pcd_env):
            env_mean_height, env_min_height, env_max_height
 
 
-def main(environment_points, annotations):
-    """ """
+def main(ply_filename, annotations_filename, path):
+    """ Getting structural complexity measures for a colony """
+    name_split = ply_filename.split("_")
+    environment_distance = name_split[4]
+    name = "_".join(name_split[0:3])
+    # Create result files these will be saved
+    all_results = "{}/results/struc_complex_results_{}.txt".format(path, ply_filename)
+    with open(all_results, 'a') as results_out:
+        print("Creating a new file\n")
+        results_out.write(
+            "plot_name\tsample_name\tcolony_points\tcolony_elevation\tcolony_rugosity\toverhang_prop\toutcrop_prop"
+            "\tenvironment_rugosity\tcolony_range\tenvironment_range\n")
+    detailed_results = "{}/results/detailed_results_{}.txt".format(path, ply_filename)
+    with open(detailed_results, 'a') as results_out:
+        results_out.write(
+            "plot_name\tsample_name\tcolony_points\ttheta\tpsi\televation"
+            "\tx_i\t_x_j\tx_k\ty_i\ty_j\ty_k\tz_i\tz_j\tz_k"
+            "\tcolony_threeD_area\trot_colony_twoD_area\tcolony_rugosity"
+            "\tcolony_2D_area\toverhang_2D_area\toverhang_prop"
+            "\tmean_colony\tlow_colony\thigh_colony\tmean_env\tlow_env\thigh_env\toutcrop_prop"
+            "\tenv_points\tenv_threeD_area\tenv_twoD_area\tenv_rugosity\n")
+
+    # 1. Read in files
+    print('Reading PLY file {} ...'.format(name))
+    pcd = o3d.io.read_point_cloud('{}/environment_points/{}.ply'.format(path, ply_filename))
+    print('Read assignment file ...')
+    annotations = get_annotations('{}/{}'.format(path, annotations_filename))
+    # Make KDTree
+    print('Making KDTree ...')
+    pcd_tree = o3d.geometry.KDTreeFlann(pcd)
+
+    # 2. Find colony within environment
+    print("\nSearching for colony around annotations ...")
+    colony = get_neighbourhood(annotations, name, pcd, pcd_tree)
+    colony_length = len(np.asarray(colony.points))
+    if colony_length <= 10:
+        print('Not including {} because < 10 points'.format(name))
+    else:
+        with open(detailed_results, 'a') as results_out:
+            results_out.write("{0}\t{1}\t{2}".format(name_split[2], name, colony_length))
+        print('Meshing ...')
+        mesh = create_mesh_ball_pivot(colony)
+        o3d.visualization.draw_geometries([mesh])
+        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
+        large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
+        o3d.visualization.draw_geometries([large_mesh])
+        print('Sampling points from mesh first uniformly then with poisson ...')
+        colony_pcd = large_mesh.sample_points_uniformly(number_of_points=colony_length)
+        colony_pcd = large_mesh.sample_points_poisson_disk(number_of_points=colony_length, pcl=colony_pcd)
+        alpha_mesh = mesh_alpha(colony_pcd, 0.01)
+        o3d.visualization.draw_geometries([alpha_mesh], mesh_show_back_face=True)
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(visible=True)  # does not work as false for me
+        vis.add_geometry(alpha_mesh)
+        vis.update_geometry(alpha_mesh)
+        vis.poll_events()
+        vis.update_renderer()
+        vis.capture_screen_image('{}/results/colony_pics/{}.png'.format(path, name))
+        vis.destroy_window()
+        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(alpha_mesh)
+        colony_threeD_area = np.sum(cluster_area).__float__()
+        print('Cluster area is ... {} m^2 for {}'.format(colony_threeD_area, name))
+        print('Fitting a plane with RAMSAC to get colony angles ...')
+        plane_model, inliers = fit_a_plane_ransac(colony_pcd)
+
+        # COLONY ANGLES
+        print('Getting colony anlges ...')
+        colony_theta_xz, colony_psi_yz, colony_elevation = calc_plane_angles(plane_model)
+        print('Colony angles: theta {}, psi {}, elevation {}'.format(colony_theta_xz, colony_psi_yz,
+                                                                     colony_elevation))
+        # COLONY RUGOSITY
+        print('Getting colony rugosity ...')
+        print('Rotate colony points according to colony slope')
+        center = colony_pcd.get_center()
+        z_n = [plane_model[0], plane_model[1], plane_model[2]]
+        random_vector = [1, 1, 1]
+        # No matter what the random vector is x_n will lie in the plane normal to z_n
+        x_n = np.cross(random_vector, z_n) / np.linalg.norm(np.cross(random_vector, z_n))
+        # Because of the right handed system y_n will be to the left of x_n and the right of z_n
+        # And orthogonal to both
+        y_n = np.cross(z_n, x_n)
+        # This creates a new coordinate system will the z_n normal to the x-y plane
+        R = np.array([x_n, y_n, z_n])
+        with open(detailed_results, 'a') as results_out:
+            results_out.write("\t{0}\t{1}\t{2}"
+                              "\t{3}\t{4}\t{5}"
+                              "\t{6}\t{7}\t{8}"
+                              "\t{9}\t{10}\t{11}".format(colony_theta_xz, colony_psi_yz, colony_elevation,
+                                                         x_n[0], x_n[1], x_n[2],
+                                                         y_n[0], y_n[1], y_n[2],
+                                                         z_n[0], z_n[1], z_n[2]))
+        colony_pcd_r = copy.deepcopy(colony_pcd)
+        colony_pcd_r.rotate(R, center=center)
+        colony_rugosity, rot_colony_twoD_area = calc_rugosity(colony_pcd_r, colony_threeD_area, name)
+        print('Rugosity is ...', colony_rugosity)
+        with open(detailed_results, 'a') as results_out:
+            results_out.write("\t{0}\t{1}\t{2}".format(colony_threeD_area, rot_colony_twoD_area, colony_rugosity))
+
+        # OVERHANG_PROP
+        print('Getting overhang proportion ...')
+        overhang_prop, twoD_area_colony, twoD_area_overhang = calc_overhang(colony_pcd, pcd)
+        print('Overhang proportion is ...', overhang_prop)
+        with open(detailed_results, 'a') as results_out:
+            results_out.write("\t{0}\t{1}\t{2}".format(twoD_area_colony, twoD_area_overhang, overhang_prop))
+
+        # OUTCROP_PROP
+        print('Getting outcrop proportion ...')
+        outcrop_prop, colony_mean_height, colony_min_height, colony_max_height, \
+        env_mean_height, env_min_height, env_max_height = calc_outcrop(colony_pcd, pcd)
+        print('Outcrop proportion is ...', outcrop_prop)
+        with open(detailed_results, 'a') as results_out:
+            results_out.write("\t{0}\t{1}\t{2}\t{3}\t{4}"
+                              "\t{5}\t{6}".format(colony_mean_height, colony_min_height,
+                                                  colony_max_height, env_mean_height,
+                                                  env_min_height, env_max_height, outcrop_prop))
+
+        # ENVIRONMENT RUGOSITY
+        print('Getting environment rugosity ...')
+        mesh = create_mesh_ball_pivot(pcd)
+        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
+        env_threeD_area = np.sum(cluster_area)
+        print('Cluster area is ... {} m^2 for {}'.format(env_threeD_area, name))
+        print('Sampling points from mesh first uniformly then with poisson ...')
+        environment_pcd = mesh.sample_points_uniformly(number_of_points=len(np.asarray(pcd.points)))
+        environment_pcd = mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(pcd.points)),
+                                                          pcl=environment_pcd)
+        env_center = environment_pcd.get_center()
+        if name_split[2] == "CA05":
+            elevation = 10.18
+        elif name_split[2] == "WP05":
+            elevation = 5.61
+        elif name_split[2] == "WP10":
+            elevation = 15.45
+        elif name_split[2] == "WP20":
+            elevation = 13.60
+        elif name_split[2] == "SB05":
+            elevation = 5.67
+        elif name_split[2] == "SB10":
+            elevation = 9.36
+        elif name_split[2] == "SB20":
+            elevation = 36.08
+        else:
+            print("Elevation not defined, find elevation of plot in plot_info.txt")
+        elevation_radians = elevation / 180 * np.pi
+        env_R = environment_pcd.get_rotation_matrix_from_axis_angle([0, -elevation_radians, 0])
+        # TODO: need find direction vector in relation to elevation!
+        environment_pcd.rotate(env_R, center=env_center)
+        environment_rugosity, env_twoD_area = calc_rugosity(environment_pcd, env_threeD_area, "{}_env".format(name))
+        with open(detailed_results, 'a') as results_out:
+            results_out.write("{0}\t{1}\t{2}\t{3}\n".format(len(np.asarray(environment_pcd.points)),
+                                                            env_threeD_area, env_twoD_area,
+                                                            environment_rugosity))
+        with open(all_results, 'a') as results_out:
+            results_out.write("{0}\t{1}\t{2}\t{3}\t{4}"
+                              "\t{5}\t{6}\t{7}\t{8}\t{9}\n".format(name_split[2], name, colony_length,
+                                                                   colony_elevation, colony_rugosity,
+                                                                   overhang_prop, outcrop_prop,
+                                                                   environment_rugosity,
+                                                                   annotations[name][3], environment_distance))
+
 
 if __name__ == '__main__':
     # Arguments
-    parser = argparse.ArgumentParser(prog="Colony clean and measure")
+    parser = argparse.ArgumentParser(prog="Measures per colony")
     parser.add_argument('ply_filename')
     parser.add_argument('annotations_filename')
-    parser.add_argument('environment_distance', type=float)
     args = parser.parse_args()
 
     ply_filename = args.ply_filename
