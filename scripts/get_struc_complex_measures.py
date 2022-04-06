@@ -11,20 +11,19 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 import alphashape
 
-__author__ = 'Pim Bongaerts and Katharine Prata'
-__copyright__ = 'Copyright (C) 2021 Pim Bongaerts and Katharine Prata'
+__author__ = 'Katharine Prata and Pim Bongaerts'
+__copyright__ = 'Copyright (C) 2021 Katharine Prata and Pim Bongaerts'
 __license__ = 'GPL'
 
 IGNORE_ANNOTATIONS = ['left', 'right', 'X']
 V_DISTANCE = -10
-PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/SQ20"
 
 
 class Viscore_metadata(object):
     """ Defining viscore metadata as a class object"""
 
     def __init__(self, subsets_filename, short_name):
-        subsets = json.load(open('{}/{}'.format(PATH, subsets_filename)))
+        subsets = json.load(open('{}/{}'.format(path, subsets_filename)))
         # Determine json key of primary model
         if '{0}/{0}'.format(short_name) in subsets['d']:
             subsets_ortho = subsets['d']['{0}/{0}'.format(short_name)]['c']['ortho']
@@ -261,7 +260,8 @@ def fit_a_lm(pcd, axes_order):
 
 
 def calc_plane_angles(plane_model):
-    """ Calculate the angles of a plane through the plane equation """
+    """ Calculate the angles of a plane through the plane equation
+        Angles are calculated by finding the angle between two vectors """
     plane_normal = [plane_model[0], plane_model[1], plane_model[2]]
     slope_xz = plane_normal[0] / plane_normal[2]
     slope_yz = plane_normal[1] / plane_normal[2]
@@ -276,7 +276,6 @@ def calc_plane_angles(plane_model):
     cos_elevation = np.dot(xy_normal, plane_normal) / (mag_xy * mag_plane)
     elevation = np.arccos(cos_elevation) * 180 / np.pi
     print('the angle between plane and x-y plane is ...', elevation)
-    # TODO: WARNING! APPEARS TO WORK FOR NOW BUT THEORETICALLY STILL DO NOT UNDERSTAND.
     return theta.__float__(), psi.__float__(), elevation.__float__()
 
 
@@ -367,7 +366,7 @@ def calc_outcrop(colony_pcd, pcd_env):
            env_mean_height, env_min_height, env_max_height
 
 
-def main(ply_filename, annotations_filename, subsets_filename):
+def main(ply_filename, annotations_filename, subsets_filename, path):
     """ Using structural complexity measures as defined in functions above given a ply file, annotation file,
     and .json file with details on up-vector and scaling factor, this script:
     (1) scales and rotates the .ply
@@ -404,8 +403,7 @@ def main(ply_filename, annotations_filename, subsets_filename):
             print("Creating a new file\n")
             results_out.write(
                 "plot_name\tsample_name\tcolony_points\ttheta\tpsi\televation"
-                "\tplane_i,\tplane_j\tplane_k\t"
-                "axis_i\taxis_j\taxis_k\n")
+                "\tx_i\t_x_j\tx_k\ty_i\ty_j\ty_k\tz_i\tz_j\tz_k\n")
         else:
             print("File exists, appending\n")
     area_results = "../results/area_results.txt"
@@ -436,7 +434,7 @@ def main(ply_filename, annotations_filename, subsets_filename):
 
     # 1. PREPARATION SUBSET COLONY POINTS AND SCALE & ROTATE ALL POINTS ####
     print('Reading PLY file {} ...'.format(ply_filename))
-    pcd = o3d.io.read_point_cloud('{}/{}'.format(PATH, ply_filename))
+    pcd = o3d.io.read_point_cloud('{}/{}'.format(path, ply_filename))
     print('Read viscore metadata file ...')
     viscore_md = Viscore_metadata(subsets_filename, short_name)
     print('Rotating matrix ...')
@@ -447,7 +445,7 @@ def main(ply_filename, annotations_filename, subsets_filename):
     print('Scaling point cloud ...')
     pcd_r.scale(viscore_md.scale_factor, center=(0, 0, 0))
     print('Read assignment file ...')
-    annotations = get_annotations('{}/{}'.format(PATH, annotations_filename))
+    annotations = get_annotations('{}/{}'.format(path, annotations_filename))
     print('Rotate and scale annotations ...')
     rotated_annotations = {}
     for name in annotations:
@@ -456,17 +454,18 @@ def main(ply_filename, annotations_filename, subsets_filename):
         for i in range(3):
             rotated_scaled_annotations[name][i] = rotated_annotations[name][i] * viscore_md.scale_factor
     print('Get scaled ranges for each sample...')
-    ranges = get_ranges('{}/{}'.format(PATH, annotations_filename), annotations, viscore_md.scale_factor)
+    ranges = get_ranges('{}/{}'.format(path, annotations_filename), annotations, viscore_md.scale_factor)
     print('Building KDTree ...')
     pcd_tree_r = o3d.geometry.KDTreeFlann(pcd_r)
     # Write info about plot
-    print('Get angles of construct...')
-    plane_model, inliers = fit_a_plane_ransac(pcd_r)
-    theta_xz, psi_yz, elevation = calc_plane_angles(plane_model)
-    print('Write plot angles to file')
-    with open(plot_info, 'a') as results_out:
-        results_out.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(ply_filename, len(np.asarray(pcd_r.points)),
-                                                             theta_xz, psi_yz, elevation))
+    # TODO: write in a check to see if the results are already there
+    #print('Get angles of construct...')
+    #plane_model, inliers = fit_a_plane_ransac(pcd_r)
+    #theta_xz, psi_yz, elevation = calc_plane_angles(plane_model)
+    #print('Write plot angles to file')
+    #with open(plot_info, 'a') as results_out:
+    #    results_out.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(ply_filename, len(np.asarray(pcd_r.points)),
+    #                                                         theta_xz, psi_yz, elevation))
 
     # 2. FIND COLONIES AND ENV ####
     print("\nSearching for colony around annotations ...")
@@ -480,8 +479,8 @@ def main(ply_filename, annotations_filename, subsets_filename):
     # 3. STATISTICS ####
     for name in colonies:
         colony_length = len(np.asarray(colonies[name].points))
-        if colony_length <= 3:
-            print('Not including {} because < 3 points'.format(name))
+        if colony_length <= 10:
+            print('Not including {} because < 10 points'.format(name))
             continue
         else:
             print('\n\n\n ***** Starting new colony ...', name, '******')
@@ -489,14 +488,14 @@ def main(ply_filename, annotations_filename, subsets_filename):
             mesh = create_mesh_ball_pivot(colonies[name])
             triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
             large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
-            vis = o3d.visualization.Visualizer()
-            vis.create_window(visible=True)  # works for me with False, on some systems needs to be true
-            vis.add_geometry(large_mesh)
-            vis.update_geometry(large_mesh)
-            vis.poll_events()
-            vis.update_renderer()
-            vis.capture_screen_image('{}.png'.format(name))
-            vis.destroy_window()
+            # vis = o3d.visualization.Visualizer()
+            # vis.create_window(visible=True)  # does not work as false for me
+            # vis.add_geometry(large_mesh)
+            # vis.update_geometry(large_mesh)
+            # vis.poll_events()
+            # vis.update_renderer()
+            # vis.capture_screen_image('../results/colony_pics/{}.png'.format(name))
+            # vis.destroy_window()
             triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
             colony_threeD_area = cluster_area.__float__()
             # TODO: NEED TO FILL HOLES IN MESH!
@@ -516,26 +515,26 @@ def main(ply_filename, annotations_filename, subsets_filename):
             print('Getting colony rugosity ...')
             print('Rotate colony points according to colony slope')
             center = colony_pcd.get_center()
-            n_z = [0, 0, 1]
-            n_p = [plane_model[0], plane_model[1], plane_model[2]]
-            if colony_elevation >= 90:
-                axis_R = np.cross(n_z, n_p)
-            elif colony_elevation < 90:
-                axis_R = np.cross(n_p, n_z)
-            else:
-                print('elevation measure did not work')
-                axis_R = None
-            colony_pcd_r = copy.deepcopy(colony_pcd)
-            R = pcd.get_rotation_matrix_from_axis_angle(axis_R)
+            z_n = [plane_model[0], plane_model[1], plane_model[2]]
+            random_vector = [1, 1, 1]
+            # No matter what the random vector is x_n will lie in the plane normal to z_n
+            x_n = np.cross(random_vector, z_n) / np.linalg.norm(np.cross(random_vector, z_n))
+            # Because of the right handed system y_n will be to the left of x_n and the right of z_n
+            # And orthogonal to both
+            y_n = np.cross(z_n, x_n)
+            # This creates a new coordinate system will the z_n normal to the x-y plane
+            R = np.array([x_n, y_n, z_n])
             with open(angle_results, 'a') as results_out:
                 results_out.write("{0}\t{1}\t{2}"
-                                  "\t{3}\t{4}"
-                                  "\t{5}\t{6}\t{7}"
-                                  "\t{8}\t{9}\t{10}\t{11}\n".format(short_name, name, colony_length,
-                                                                    colony_theta_xz, colony_psi_yz,
-                                                                    colony_elevation, n_p[0], n_p[1],
-                                                                    n_p[2], axis_R[0], axis_R[1], axis_R[2]))
-
+                                  "\t{3}\t{4}\t{5}"
+                                  "\t{6}\t{7}\t{8}"
+                                  "\t{9}\t{10}\t{11}"
+                                  "\t{12}\t{13}\t{14}\n".format(short_name, name, colony_length,
+                                                                colony_theta_xz, colony_psi_yz, colony_elevation,
+                                                                x_n[0], x_n[1], x_n[2],
+                                                                y_n[0], y_n[1], y_n[2],
+                                                                z_n[0], z_n[1], z_n[2]))
+            colony_pcd_r = copy.deepcopy(colony_pcd)
             colony_pcd_r.rotate(R, center=center)
             colony_rugosity, rot_colony_twoD_area = calc_rugosity(colony_pcd_r, colony_threeD_area)
             print('Rugosity is ...', colony_rugosity)
@@ -574,6 +573,12 @@ def main(ply_filename, annotations_filename, subsets_filename):
                 pcl=environment_pcd)
             print('Orient to plot slopes')
             env_center = environment_pcd.get_center()
+            if args.site == "SB20":
+                elevation = 36.08
+            elif args.site == "WP20":
+                elevation = 13.60
+            else:
+                print("Elevation not defined, find elevation of plot in plot_info.txt")
             elevation_radians = elevation / 180 * np.pi
             env_R = environment_pcd.get_rotation_matrix_from_axis_angle([0, -elevation_radians, 0])
             # TODO: need find direction vector in relation to elevation!
@@ -595,7 +600,7 @@ def main(ply_filename, annotations_filename, subsets_filename):
                                                                        overhang_prop, outcrop_prop,
                                                                        environment_rugosity,
                                                                        ranges[name], env_range[name]))
-
+    # TODO: output X random point normals from each colony
     anno_df = pd.DataFrame(rotated_scaled_annotations).T
     anno_df.columns = ['x', 'y', 'z']
     anno_df.to_csv('~/git/coralscape/results/scaled_annotations_{}.csv'.format(ply_filename))
@@ -618,21 +623,24 @@ if __name__ == '__main__':
     parser.add_argument('ply_filename')
     parser.add_argument('annotations_filename')
     parser.add_argument('subsets_filename')
+    parser.add_argument('site')
     args = parser.parse_args()
 
     ply_filename = args.ply_filename
     annotations_filename = args.annotations_filename
     subsets_filename = args.subsets_filename
+    path = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/{}".format(args.site)
 
     # e.g.,
     # args.ply_filename = "cur_kal_20m_20200214_decvis_02.ply"
     # args.annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
-    # args.subsets_filename = "subsets.json"
+    # args.subsets_filename = "cur_kal_20m_20200214_subsets.json"
+    # args.site = "WP20"
 
     # PLOTS & ROTATIONS:
     # WP05 cur_kal_05m_20200214_decvis_02_KP
     # theta -6.91, psi 21.08
-    # WP10 cur_kal_10m_20200214_decvis_02_KP_905
+    # WP10 cur_kal_10m_20200214_decvis_02_KP_905_updated16-3-22
     # theta = -25.11, psi = 11.65
     # WP20 cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed
     # theta = 9.02, psi = 19.25
@@ -649,4 +657,4 @@ if __name__ == '__main__':
     # theta = 2.86, psi = -0.24
     # SQ20 cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
 
-    main(ply_filename, annotations_filename, subsets_filename)
+    main(ply_filename, annotations_filename, subsets_filename, path)
