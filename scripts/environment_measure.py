@@ -315,13 +315,13 @@ def calc_environment_rugosity(environment):
         environment_pcd = mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(environment[name].points)),
                                                           pcl=environment_pcd)
         print('Fitting a plane to correct for environment slope')
-        plane_model_env, inliers_env = fit_a_plane_ransac(environment_pcd)
-        env_theta_xz, env_psi_yz = calc_plane_angles(plane_model_env)
-        env_theta_radians = env_theta_xz / (180 * np.pi)
-        env_psi_radians = env_psi_yz / (180 * np.pi)
-        env_R = environment_pcd.get_rotation_matrix_from_xyz((env_psi_radians, env_theta_radians, 0))
-        center = environment_pcd.get_center()
-        environment_pcd.rotate(env_R, center=center)
+        #plane_model_env, inliers_env = fit_a_plane_ransac(environment_pcd)
+        #env_theta_xz, env_psi_yz = calc_plane_angles(plane_model_env)
+        #env_theta_radians = env_theta_xz / (180 * np.pi)
+        #env_psi_radians = env_psi_yz / (180 * np.pi)
+        #env_R = environment_pcd.get_rotation_matrix_from_xyz((env_psi_radians, env_theta_radians, 0))
+        #center = environment_pcd.get_center()
+        #environment_pcd.rotate(env_R, center=center)
         rugosity = calc_rugosity(environment_pcd, threeD_area)
         environment_rugosity[name] = rugosity
     return environment_rugosity
@@ -415,27 +415,23 @@ def main(sample_name, largest_cluster_mesh):
     pcd_env = o3d.io.read_point_cloud("colony_point_clouds/{}_env.ply".format(sample_name))
 
     o3d.visualization.draw_geometries([pcd])
-    cloud_points = len(np.asarray(pcd.points))
-    #o3d.visualization.draw_geometries([pcd_env])
+    #cloud_points = len(np.asarray(pcd.points))
+    o3d.visualization.draw_geometries([pcd_env])
     # Remove outlier points
     # ind = remove_outlier_points(pcd_env)
     # display_inlier_outlier(pcd_env, ind)  # may need to do this
 
     # Create mesh
     mesh = create_mesh_ball_pivot(pcd)
-    # o3d.visualization.draw_ geometries([mesh])  # need to clean points before meshing in some cases maybe
+    o3d.visualization.draw_geometries([mesh])  # need to clean points before meshing in some cases maybe
     triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
     mesh_removed = remove_small_clusters(mesh, cluster_n_triangles, triangle_clusters, threshold=5)
-    if largest_cluster_mesh == 'Yes':
-        large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
-        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
-        threeD_area = cluster_area
-    else:
-        large_mesh = mesh_removed
-        threeD_area = np.sum(cluster_area)
-        'Print not subsampling to largest mesh'
 
-    print('Cluster area is ... {} m^2'.format(threeD_area))
+    large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
+    triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
+    threeD_area = cluster_area
+
+    #print('Cluster area is ... {} m^2'.format(threeD_area))
 
     # Convert mesh back to point cloud within non-clustered sampling, i.e., using poisson
     print('Sampling points from mesh first uniformaly then with poisson ...')
@@ -444,8 +440,8 @@ def main(sample_name, largest_cluster_mesh):
     o3d.visualization.draw_geometries([pcd])
 
     # overhang
-    overhang = calc_overhang_mainpy(pcd, pcd_env)
-    print(overhang)
+    #overhang = calc_overhang_mainpy(pcd, pcd_env)
+    #print(overhang)
 
     #  Fit plane ransac
     plane_model, inliers = fit_a_plane_ransac(pcd)
@@ -481,18 +477,33 @@ def main(sample_name, largest_cluster_mesh):
     plot_points_together(pcd, pcd_r4, sample_name, 4)
     print('Sample:', sample_name, 'plane model', plane_model, '\naxis of rotation', axis_R1, '\nangle of elevation',
           elevation)
+    rugosity = calc_rugosity(pcd_r1, threeD_area)
+
     print('axis of rotation two:', axis_R2, '\n')
     plot_points_together_colours(pcd, pcd_r1, sample_name, 1)
     plot_points_together_colours(pcd, pcd_r2, sample_name, 2)
     plot_points_together_colours(pcd, pcd_r3, sample_name, 3)
     print('Outputting results ... :)')
+
+    # Environment rotation
+    # Env center
+    env_center = pcd_env.get_center()
+    elevation_radians = 9.813398248013115 / 180 * np.pi
+    env_R = pcd_env.get_rotation_matrix_from_axis_angle([0, elevation_radians, 0])
+    pcd_env_r = copy.deepcopy(pcd_env)
+    pcd_env_r.rotate(env_R, center=env_center)
+    environment_rugosity = calc_environment_rugosity(pcd_env_r)
+    plot_points_together(pcd_env, pcd_env_r, sample_name, 1)
+
+
+
     with open(out_name, "a") as results_out:
         results_out.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}"
                           "\t{8}\t{9}\t{10}\t{11}\n".format(sample_name, cloud_points, n_p[0], n_p[1], n_p[2],
                                                             axis_R1[0], axis_R1[1], axis_R1[2], axis_R2[0], axis_R2[1],
                                                             axis_R2[2], elevation))
 
-
+# TODO: clean up - need a better way to visualise rotations...
 if __name__ == '__main__':
     # 287 overhang included but removed with mesh
     # 350 is a large/difficult one, but it actually worked!
