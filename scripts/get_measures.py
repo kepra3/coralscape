@@ -16,6 +16,7 @@ import open3d as o3d
 import copy
 import alphashape
 from descartes import PolygonPatch
+import os
 
 
 def get_annotations(annotations_path):
@@ -47,15 +48,26 @@ def get_neighbourhood(annotations, ply_filename, pcd, pcd_tree):
     return colony
 
 
+def find_ground_points(past_colony_pcd, colony):
+    dists = past_colony_pcd.compute_point_cloud_distance(colony)
+    dists = np.asarray(dists)
+    ind = np.where(dists != 0)[0]
+    ground_pcd = o3d.geometry.PointCloud()
+    ground_pcd.points = o3d.utility.Vector3dVector(np.asarray(past_colony_pcd.points)[ind[0:], :])
+    ground_pcd.normals = o3d.utility.Vector3dVector(np.asarray(past_colony_pcd.normals)[ind[0:], :])
+    ground_pcd.colors = o3d.utility.Vector3dVector(np.asarray(past_colony_pcd.colors)[ind[0:], :])
+    return ground_pcd
+
+
 def create_mesh_ball_pivot(pcd):
     """ Create a mesh from a point cloud through the ball pivot method """
     # estimate radius for rolling ball
     distances = pcd.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
     radius = 1.5 * avg_dist
-    radii = [radius]
-    for i in range(0, 9):
-        radii.append(radii[i] * 2)
+    radii = []
+    for i in range(1, 10):
+        radii.append(radius * i)
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcd, o3d.utility.DoubleVector(radii))
     return mesh
 
@@ -142,7 +154,16 @@ def calc_rugosity(pcd_r, threeD_area, name):
     fig, ax = plt.subplots()
     ax.scatter(x=points_2d[:, 0], y=points_2d[:, 1])
     ax.add_patch(PolygonPatch(alpha_shape, alpha=0.2))
-    plt.savefig("{}/results/colony_pics/polygonPatch_{}.png".format(path, name))
+    name_list = name.split("_")
+    if len(name_list) == 5:
+        try:
+            os.makedirs("{}/results/{}/polygon".format(path, "_".join(name_list[3:5])), exist_ok=True)
+            print("New directory created, '%s'" % "polygon")
+        except OSError as error:
+            print("Directory '%s' can not be created" % "polygon")
+        plt.savefig("{}/results/{}/polygon/polygonPatch_{}.png".format(path, "_".join(name_list[3:5]), name))
+    else:
+        plt.savefig("{}/results/colony_pics/polygonPatch_{}.png".format(path, name))
     rotated_twoD_area = alpha_shape.area
     print('2D area is ...', rotated_twoD_area)
     rugosity = threeD_area / rotated_twoD_area
@@ -154,7 +175,7 @@ def calc_rugosity(pcd_r, threeD_area, name):
     return rugosity, rotated_twoD_area
 
 
-def calc_overhang(colony_pcd, pcd_env):
+def calc_overhang(colony_pcd, pcd_env, name):
     """ Calculate the proportion of a colony is covered by an overhang given surrounding environment points """
     dists = pcd_env.compute_point_cloud_distance(colony_pcd)
     dists = np.asarray(dists)
@@ -184,12 +205,24 @@ def calc_overhang(colony_pcd, pcd_env):
         colony_2d = np.asarray((colony_x, colony_y)).transpose()
         alpha_shape_colony = alphashape.alphashape(colony_2d, 18.0)
         twoD_area_colony = alpha_shape_colony.area
-        if len(q) > 0:
-            unique_int = np.unique(q)
+        unique_int = np.unique(q)
+        if len(unique_int) > 1:
             overhang_x = np.asarray(pcd_env.points)[unique_int, 0]
             overhang_y = np.asarray(pcd_env.points)[unique_int, 1]
             overhang = np.asarray((overhang_x, overhang_y)).transpose()
             alpha_shape_overhang = alphashape.alphashape(overhang, 25.0)
+            fig, ax = plt.subplots()
+            ax.scatter(x=colony_x, y=colony_y, color='blue')
+            ax.scatter(x=overhang_x, y=overhang_y, color='red')
+            ax.add_patch(PolygonPatch(alpha_shape_colony, alpha=0.2, color='blue'))
+            ax.add_patch(PolygonPatch(alpha_shape_overhang, alpha=0.2, color='red'))
+            name_list = name.split("_")
+            try:
+                os.makedirs("{}/results/{}/overhang".format(path, "_".join(name_list[3:5])), exist_ok=True)
+                print("New directory created, '%s'" % "overhang")
+            except OSError as error:
+                print("Directory '%s' can not be created" % "overhang")
+            plt.savefig('{}/results/{}/overhang/overhang_cover_{}.png'.format(path, "_".join(name_list[3:5]), name))
             twoD_area_overhang = alpha_shape_overhang.area
             overhang_prop = twoD_area_overhang / twoD_area_colony
         else:
@@ -225,21 +258,31 @@ def main(ply_filename, annotations_filename, path):
     name_split = ply_filename.split("_")
     environment_distance = name_split[4]
     name = "_".join(name_split[0:3])
+    env = "_".join(name_split[3:5])
     # Create result files these will be saved
-    all_results = "{}/results/struc_complex_results_{}.txt".format(path, ply_filename)
+    try:
+        os.makedirs("{}/results/{}".format(path, env), exist_ok=True)
+        print("New directory created, '%s'" % env)
+    except OSError as error:
+        print("Directory '%s' can not be created" % env)
+    all_results = "{}/results/{}/struc_complex_results_{}.txt".format(path, env, ply_filename)
     with open(all_results, 'a') as results_out:
         print("Creating a new file\n")
         results_out.write(
-            "plot_name\tsample_name\tcolony_points\tcolony_elevation\tcolony_rugosity\toverhang_prop\toutcrop_prop"
+            "plot_name\tsample_name\tcolony_points\tcolony_elevation\tground_elevation\t"
+            "colony_rugosity\toverhang_prop\toutcrop_prop"
             "\tenvironment_rugosity\tcolony_range\tenvironment_range\n")
-    detailed_results = "{}/results/detailed_results_{}.txt".format(path, ply_filename)
+    detailed_results = "{}/results/{}/detailed_results_{}.txt".format(path, env, ply_filename)
     with open(detailed_results, 'a') as results_out:
         results_out.write(
-            "plot_name\tsample_name\tcolony_points\ttheta\tpsi\televation"
+            "plot_name\tsample_name\tcolony_points"
+            "\ttheta_ground\tpsi_ground\televation_ground"
+            "\ttheta\tpsi\televation"
             "\tx_i\t_x_j\tx_k\ty_i\ty_j\ty_k\tz_i\tz_j\tz_k"
             "\tcolony_threeD_area\trot_colony_twoD_area\tcolony_rugosity"
             "\tcolony_2D_area\toverhang_2D_area\toverhang_prop"
             "\tmean_colony\tlow_colony\thigh_colony\tmean_env\tlow_env\thigh_env\toutcrop_prop"
+            "\tmean_ground\tlow_ground\thigh_ground\toutcrop_prop_ground"
             "\tenv_points\tenv_threeD_area\tenv_twoD_area\tenv_rugosity\n")
 
     # 1. Read in files
@@ -260,37 +303,52 @@ def main(ply_filename, annotations_filename, path):
     else:
         with open(detailed_results, 'a') as results_out:
             results_out.write("{0}\t{1}\t{2}".format(name_split[2], name, colony_length))
+        # 3. Find ground past colony
+        annotations_two = copy.deepcopy(annotations)
+        annotations_two[name][3] = annotations_two[name][3] + 0.04  # maybe 4cm?
+        past_colony_pcd = get_neighbourhood(annotations_two, name, pcd, pcd_tree)
+        ground_pcd = find_ground_points(past_colony_pcd, colony)
+
+        # 4. Mesh the colony to remove outlier points
         print('Meshing ...')
         mesh = create_mesh_ball_pivot(colony)
-        o3d.visualization.draw_geometries([mesh])
+        # o3d.visualization.draw_geometries([mesh])
         triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
         large_mesh = largest_cluster(mesh, cluster_n_triangles, triangle_clusters)
-        o3d.visualization.draw_geometries([large_mesh])
+        # o3d.visualization.draw_geometries([large_mesh])
         print('Sampling points from mesh first uniformly then with poisson ...')
         colony_pcd = large_mesh.sample_points_uniformly(number_of_points=colony_length)
         colony_pcd = large_mesh.sample_points_poisson_disk(number_of_points=colony_length, pcl=colony_pcd)
-        alpha_mesh = mesh_alpha(colony_pcd, 0.01)
-        o3d.visualization.draw_geometries([alpha_mesh], mesh_show_back_face=True)
-        vis = o3d.visualization.Visualizer()
-        vis.create_window(visible=True)  # does not work as false for me
-        vis.add_geometry(alpha_mesh)
-        vis.update_geometry(alpha_mesh)
-        vis.poll_events()
-        vis.update_renderer()
-        vis.capture_screen_image('{}/results/colony_pics/{}.png'.format(path, name))
-        vis.destroy_window()
-        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(alpha_mesh)
+        # maybe need an estimate point normals here.
+        # alpha_mesh = mesh_alpha(colony_pcd, 0.01) not working well...
+        # o3d.visualization.draw_geometries([alpha_mesh])
+        # vis = o3d.visualization.Visualizer()
+        # vis.create_window(visible=True)  # does not work as false for me
+        # vis.add_geometry(alpha_mesh)
+        # vis.update_geometry(alpha_mesh)
+        # vis.poll_events()
+        # vis.update_renderer()
+        # vis.capture_screen_image('{}/results/colony_pics/{}.png'.format(path, name))
+        # vis.destroy_window()
+        triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(large_mesh)
         colony_threeD_area = np.sum(cluster_area).__float__()
         print('Cluster area is ... {} m^2 for {}'.format(colony_threeD_area, name))
+
+        # 5. Calculating colony angles and ground slope angles
         print('Fitting a plane with RAMSAC to get colony angles ...')
         plane_model, inliers = fit_a_plane_ransac(colony_pcd)
-
-        # COLONY ANGLES
         print('Getting colony anlges ...')
         colony_theta_xz, colony_psi_yz, colony_elevation = calc_plane_angles(plane_model)
         print('Colony angles: theta {}, psi {}, elevation {}'.format(colony_theta_xz, colony_psi_yz,
                                                                      colony_elevation))
-        # COLONY RUGOSITY
+        plane_model_g, inliers_g = fit_a_plane_ransac(ground_pcd)
+        print('Getting ground angles ...')
+        ground_theta_xz, ground_psi_yz, ground_elevation = calc_plane_angles(plane_model_g)
+        print('Ground angles: theta {}, psi {}, elevation {}'.format(ground_theta_xz, ground_psi_yz, ground_elevation))
+        with open(detailed_results, 'a') as results_out:
+            results_out.write('\t{0}\t{1}\t{2}'.format(ground_theta_xz, ground_psi_yz, ground_elevation))
+
+        # 6. Calculating colony rugosity
         print('Getting colony rugosity ...')
         print('Rotate colony points according to colony slope')
         center = colony_pcd.get_center()
@@ -318,14 +376,14 @@ def main(ply_filename, annotations_filename, path):
         with open(detailed_results, 'a') as results_out:
             results_out.write("\t{0}\t{1}\t{2}".format(colony_threeD_area, rot_colony_twoD_area, colony_rugosity))
 
-        # OVERHANG_PROP
+        # 7. Calculate overhang proportion
         print('Getting overhang proportion ...')
-        overhang_prop, twoD_area_colony, twoD_area_overhang = calc_overhang(colony_pcd, pcd)
+        overhang_prop, twoD_area_colony, twoD_area_overhang = calc_overhang(colony_pcd, pcd, ply_filename)
         print('Overhang proportion is ...', overhang_prop)
         with open(detailed_results, 'a') as results_out:
             results_out.write("\t{0}\t{1}\t{2}".format(twoD_area_colony, twoD_area_overhang, overhang_prop))
 
-        # OUTCROP_PROP
+        # 8. Calculate outcrop proportion
         print('Getting outcrop proportion ...')
         outcrop_prop, colony_mean_height, colony_min_height, colony_max_height, \
         env_mean_height, env_min_height, env_max_height = calc_outcrop(colony_pcd, pcd)
@@ -335,8 +393,14 @@ def main(ply_filename, annotations_filename, path):
                               "\t{5}\t{6}".format(colony_mean_height, colony_min_height,
                                                   colony_max_height, env_mean_height,
                                                   env_min_height, env_max_height, outcrop_prop))
+        # use this for outcrop_prop...
+        outcrop_prop_ground, colony_mean_height, colony_min_height, colony_max_height, \
+        ground_mean_height, ground_min_height, ground_max_height = calc_outcrop(colony_pcd, ground_pcd)
+        with open(detailed_results, 'a') as results_out:
+            results_out.write("\t{0}\t{1}\t{2}\t{3}".format(ground_mean_height,
+                                                            ground_min_height, ground_max_height, outcrop_prop_ground))
 
-        # ENVIRONMENT RUGOSITY
+        # 9. Calculate environment rugosity
         print('Getting environment rugosity ...')
         mesh = create_mesh_ball_pivot(pcd)
         triangle_clusters, cluster_n_triangles, cluster_area = get_cluster_triangles(mesh)
@@ -367,24 +431,26 @@ def main(ply_filename, annotations_filename, path):
         env_R = environment_pcd.get_rotation_matrix_from_axis_angle([0, -elevation_radians, 0])
         # TODO: need find direction vector in relation to elevation!
         environment_pcd.rotate(env_R, center=env_center)
-        environment_rugosity, env_twoD_area = calc_rugosity(environment_pcd, env_threeD_area, "{}_env".format(name))
+        environment_rugosity, env_twoD_area = calc_rugosity(environment_pcd, env_threeD_area, ply_filename)
+        print('Environment rugosity is  ... {}'.format(environment_rugosity))
         with open(detailed_results, 'a') as results_out:
             results_out.write("{0}\t{1}\t{2}\t{3}\n".format(len(np.asarray(environment_pcd.points)),
                                                             env_threeD_area, env_twoD_area,
                                                             environment_rugosity))
         with open(all_results, 'a') as results_out:
             results_out.write("{0}\t{1}\t{2}\t{3}\t{4}"
-                              "\t{5}\t{6}\t{7}\t{8}\t{9}\n".format(name_split[2], name, colony_length,
-                                                                   colony_elevation, colony_rugosity,
-                                                                   overhang_prop, outcrop_prop,
-                                                                   environment_rugosity,
-                                                                   annotations[name][3], environment_distance))
+                              "\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\n".format(name_split[2], name, colony_length,
+                                                                         colony_elevation, ground_elevation,
+                                                                         colony_rugosity,
+                                                                         overhang_prop, outcrop_prop,
+                                                                         environment_rugosity,
+                                                                         annotations[name][3], environment_distance))
 
 
 if __name__ == '__main__':
     # Arguments
     parser = argparse.ArgumentParser(prog="Measures per colony")
-    parser.add_argument('ply_filename')
+    parser.add_argument('ply_filename', help="ply_filename is sample with '_env_0.1' with no .ply extension")
     parser.add_argument('annotations_filename')
     args = parser.parse_args()
 
