@@ -83,6 +83,8 @@ def main(ply_filename, annotations_filename, PATH):
     print('Read viscore metadata file ...')
     if short_name == "cur_cas_10m_20201212":
         scale = 0.10383552972538619
+    elif short_name == "cur_cas_20m_20201212":
+        scale = 0.10214017812800297
     elif short_name == "cur_seb_10m_20201210":
         scale = 0.21249641478078696
     elif short_name == "cur_seb_20m_20201210":
@@ -231,10 +233,9 @@ if __name__ == '__main__':
     # note had to alter subsets.json file to have cur_cas_05m_20201212/cur_cas_05m_20201212
     # theta = 2.86, psi = -0.24
     # CA10 cur_cas_10m_20201212_decvis_02.ply cur_cas_10m_20201210_decvis_02_SH_done.txt
-    # CA20 cur_cas_20m_20201212_decvis_02.ply
+    # CA20 cur_cas_20m_20201212_decvis_02.ply cur_cas_20m_20201212_decvis_02_SH_03-05-22.txt
     # SQ12 cur_seb_10m_20201210_decvis_02_SH_updated.txt
     # SQ20 cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
 
     # TODO: check, 0 ranges from _left and _right WP05
-    # TODO: enter in all the rotation matricies for CA20!
     # TODO: KP0160_AC_SQ12 does not have a two longest edge points! Need to find other point

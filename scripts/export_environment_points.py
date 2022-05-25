@@ -69,7 +69,8 @@ def main(ply_filename, annotations_filename, environment_distance, path):
         colony_env = environment[name]
         print(colony_env)
         print(type(colony_env))
-        o3d.io.write_point_cloud('/Volumes/KP3/coralscape/environment_points/{}_env_{}.ply'.format(name, environment_distance), colony_env)  # should save normals & rgb
+        o3d.io.write_point_cloud('{}/environment_points/{}_env_{}.ply'.format(path, name, environment_distance),
+                                 colony_env)  # should save normals & rgb
 
 
 if __name__ == '__main__':
