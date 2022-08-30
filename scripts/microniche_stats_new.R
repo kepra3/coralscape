@@ -261,35 +261,35 @@ ggplot(metadata, aes(colony_rugosity, colony_elevation_corr, colour = Clusters))
   geom_point() + theme_classic()
   
 param_list = c('colony_rugosity_sqrt', 'environment_rugosity_sqrt', 'colony_elevation_corr', 'outcrop_prop', 'overhang_prop_2', 'area_sqrt')
-site_list = c('SB05', 'SB10', 'SB20', 'WP05', 'WP10', 'WP20') # , "CA05"
+site_list = c('SB05', 'SB10', 'SB20', 'WP05', 'WP10', 'WP20', "CA05")
 depth_list = c('20', '10', '5')
 
 for (i in param_list) {
   print("Starting new parameter loop")
   p <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours)
   print(p)
-  ggsave(paste0("plots/", i, ".png"), p)
+  ggsave(paste0("plots/", i, ".pdf"), p)
   p1 <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours, facet = "All")
   print(p1)
-  ggsave(paste0("plots/", i, "_facet.png"), p1, height = 30, width = 20, units = "cm")
+  ggsave(paste0("plots/", i, "_facet.pdf"), p1, height = 30, width = 20, units = "cm")
   print("Starting site loop")
   pd <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours, facet = "Depth")
   print(pd)
-  ggsave(paste0("plots/", i, "_depth.png"), pd, height = 15, width = 20, units = "cm")
+  ggsave(paste0("plots/", i, "_depth.pdf"), pd, height = 15, width = 20, units = "cm")
   pl <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours, facet = "Loc")
   print(pl)
-  ggsave(paste0("plots/", i, "_loc.png"), pl, height = 15, width = 20, units = "cm")
+  ggsave(paste0("plots/", i, "_loc.pdf"), pl, height = 15, width = 20, units = "cm")
   for (j in site_list) {
     site <- metadata[metadata$Site == j,]
     p2 <- k_boxplot(site, site$Clusters, site[,i], paste(i, j), colours)
     print(p2)
-    ggsave(paste0("plots/", i, "_", j, ".png"), p2)}
+    ggsave(paste0("plots/", i, "_", j, ".pdf"), p2)}
   print("Starting depth loop")
   for (k in depth_list) {
       depth <- metadata[metadata$Depth == k,]
       p3 <- k_boxplot(depth, depth$Clusters, depth[,i], paste(i, k), colours)
       print(p3)
-      ggsave(paste0("plots/", i, "_", k, ".png"), p3)}
+      ggsave(paste0("plots/", i, "_", k, ".pdf"), p3)}
   }
 
 # Proportion of colonies ###

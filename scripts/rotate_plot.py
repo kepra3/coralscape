@@ -214,7 +214,7 @@ def main(ply_filename, annotations_filename, subsets_filename, path, KDTree='No'
 
 if __name__ == '__main__':
     # Arguments
-    parser = argparse.ArgumentParser(prog="Colony clean and measure")
+    parser = argparse.ArgumentParser(prog="Rotate ply and annotations")
     parser.add_argument('ply_filename', help='Filename of PLY file')
     parser.add_argument('annotations_filename', help='Filename of annotations file')
     parser.add_argument('subsets_filename', help='Filename of Viscore metadata, subsets.json')
@@ -253,6 +253,19 @@ if __name__ == '__main__':
     # CA05 cur_cas_05m_20201212_decvis_02_KP_31-01-22.txt
     # note had to alter subsets.json file to have cur_cas_05m_20201212/cur_cas_05m_20201212
     # theta = 2.86, psi = -0.24
-    # SQ20 cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
+    # CA10 cur_cas_10m_20201212_decvis_02.ply cur_cas_10m_20201210_decvis_02_SH_done.txt
+    # note had to alter subsets.json
+    # Theta is ... -12.36016759332716
+    # Psi is ... -10.45657839852049
+    # CA20 cur_cas_20m_20201212_decvis_02.ply cur_cas_20m_20201212_decvis_02_SH_01-06-22.txt
+    # NOTE 1161 did not have a left (thus have put an _X for now - need to fix this)
+    # Theta is ... -32.03105065955869
+    # Psi is ... -6.77682359250437
+    # SQ12 cur_seb_10m_20201210_decvis_02.ply cur_seb_10m_20201210_decvis_02_SH_updated.txt
+    #Theta is ... -11.644224255407794
+    #Psi is ... 2.8498421712287363
+    # SQ20 cur_seb_20m_20201210_decvis_02.ply cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
+    # Theta is ... 29.32225489795626
+    # Psi is ... -0.6445221821626353
 
     main(ply_filename, annotations_filename, subsets_filename, path, KDTree)

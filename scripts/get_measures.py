@@ -287,9 +287,9 @@ def main(ply_filename, annotations_filename, path):
 
     # 1. Read in files
     print('Reading PLY file {} ...'.format(name))
-    pcd = o3d.io.read_point_cloud('{}/environment_points/{}.ply'.format(path, ply_filename))
+    pcd = o3d.io.read_point_cloud('{}/data/environment_points/{}.ply'.format(path, ply_filename))
     print('Read assignment file ...')
-    annotations = get_annotations('{}/{}'.format(path, annotations_filename))
+    annotations = get_annotations('{}/data/{}'.format(path, annotations_filename))
     # Make KDTree
     print('Making KDTree ...')
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)
@@ -411,20 +411,29 @@ def main(ply_filename, annotations_filename, path):
         environment_pcd = mesh.sample_points_poisson_disk(number_of_points=len(np.asarray(pcd.points)),
                                                           pcl=environment_pcd)
         env_center = environment_pcd.get_center()
-        if name_split[2] == "CA05":
-            elevation = 10.18
-        elif name_split[2] == "WP05":
-            elevation = 5.61
+
+        if name_split[2] == "WP05":
+            elevation = 5.35
         elif name_split[2] == "WP10":
-            elevation = 15.45
+            elevation = 14.56
         elif name_split[2] == "WP20":
-            elevation = 13.60
+            elevation = 9.88
+        elif name_split[2] == "CA05":
+            elevation = 9.66
+        elif name_split[2] == "CA10":
+            elevation = 3.53
+        elif name_split[2] == "CA20":
+            elevation = 35.06
         elif name_split[2] == "SB05":
-            elevation = 5.67
+            elevation = 5.70
         elif name_split[2] == "SB10":
-            elevation = 9.36
+            elevation = 8.85
         elif name_split[2] == "SB20":
-            elevation = 36.08
+            elevation = 34.35
+        elif name_split[2] == "SQ12":
+            elevation = 12.23
+        elif name_split[2] == "SQ20":
+            elevation = 14.97
         else:
             print("Elevation not defined, find elevation of plot in plot_info.txt")
         elevation_radians = elevation / 180 * np.pi
@@ -456,5 +465,5 @@ if __name__ == '__main__':
 
     ply_filename = args.ply_filename
     annotations_filename = args.annotations_filename
-    path = "/Volumes/KP3/coralscape"
+    path = ".."
     main(ply_filename, annotations_filename, path)

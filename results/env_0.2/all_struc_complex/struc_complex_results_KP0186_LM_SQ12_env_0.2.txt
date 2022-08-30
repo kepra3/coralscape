@@ -1,0 +1,2 @@
+plot_name	sample_name	colony_points	colony_elevation	ground_elevation	colony_rugosity	overhang_prop	outcrop_prop	environment_rugosity	colony_range	environment_range
+SQ12	KP0186_LM_SQ12	45937	80.33793795458325	36.49148627540561	1.3836567208272956	0.14821808138597437	0.4282738628091904	1.883954556749186	0.22241797343753417	0.2

@@ -1,0 +1,2 @@
+plot_name	sample_name	colony_points	colony_elevation	ground_elevation	colony_rugosity	overhang_prop	outcrop_prop	environment_rugosity	colony_range	environment_range
+WP10	KP0811_AC_WP10	631	10.51241050409191	22.311194294882196	1.079402320159154	0.3632900287546479	0.46777085447298744	2.670752862073461	0.041588185507538004	0.2

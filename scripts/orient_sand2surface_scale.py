@@ -167,12 +167,13 @@ def main(ply_filename, annotations_filename, PATH):
         for i in range(3):
             scaled_rotated_annotations[name][i] = rotated_annotations[name][i] * scale
     print("Scaling ranges for each sample")
-    ranges = get_ranges('{}/{}'.format(PATH, annotations_filename), annotations, scale)
+    #ranges = get_ranges('{}/{}'.format(PATH, annotations_filename), annotations, scale)
     print('Exporting rotated and scaled annotations as csv')
     annotation_df = pd.DataFrame(scaled_rotated_annotations).T
-    annotation_df.columns = ['x', 'y', 'z', 'range']
-    annotation_df['range'] = ranges.values()
-    annotation_df.to_csv('{}/scaled_HORIZ_annotations_{}.csv'.format(PATH, short_name))
+    annotation_df.columns = ['x', 'y', 'z', 'p']
+    # annotation_df['range'] = ranges.values()
+    # TODO: NOTE! not including range for now
+    annotation_df.to_csv('{}/scaled_HORIZ_annotations_X_{}.csv'.format(PATH, short_name))
 
 
 if __name__ == '__main__':
@@ -210,32 +211,43 @@ if __name__ == '__main__':
     site = "".join(loc_depth)
 
     # GLOBAL VARIABLES
-    IGNORE_ANNOTATIONS = ['left', 'right', 'X']
+    IGNORE_ANNOTATIONS = ['left', 'right']
     PATH = "/Users/kprata/Dropbox/agaricia_project_2019/shalo_ag/Photogrammetry/CloudCompare/{}".format(site)
 
     main(ply_filename, annotations_filename, PATH)
     # PLOTS & ROTATIONS:
-    # WP05 cur_kal_05m_20200214_decvis_02_KP.txt
+    # WP05
+    # python orient_sand2surface_scale.py cur_kal_05m_20200214_decvis_02.ply cur_kal_05m_20200214_decvis_02_KP.txt
     # theta -6.91, psi 21.08
-    # WP10 cur_kal_10m_20200214_decvis_02_KP_905_updated16-3-22.txt
+    # WP10
+    # python orient_sand2surface_scale.py cur_kal_10m_20200214_decvis_02.ply cur_kal_10m_20200214_decvis_02_KP_905_updated16-3-22.txt
     # theta = -25.11, psi = 11.65
-    # WP20 cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt
+    # WP20
+    # python orient_sand2surface_scale.py cur_kal_20m_20200214_decvis_02.ply cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt
     # theta = 9.02, psi = 19.25
-    # SB05 cur_sna_05m_20200303_decvis_02_SF_HI_19-1-22.txt
+    # SB05
+    # python orient_sand2surface_scale.py cur_sna_05m_20200303_decvis_02.ply cur_sna_05m_20200303_decvis_02_SF_HI_19-1-22.txt
     # theta = -3.90, psi = 12.30
-    # SB10 cur_sna_10m_20200303_decvis_02
-    # SB10 cur_sna_10m_20201202_decvisann_HI_14-12-21.txt
+    # SB10
+    # python orient_sand2surface_scale.py cur_sna_10m_20200303_decvis_02.ply cur_sna_10m_20201202_decvisann_HI_14-12-21.txt
     # theta = -0.72, psi = -2.71
-    # SB20 cur_sna_20m_20200303_decvis_02
-    # SB20 cur_sna_20m_20190410_decvisann_HI_12_12.txt
+    # SB20
+    # python orient_sand2surface_scale.py cur_sna_20m_20200303_decvis_02.ply cur_sna_20m_20190410_decvisann_HI_12_12.txt
     # theta = -16.82, psi = 18.23
-    # CA05 cur_cas_05m_20201212_decvis_02_KP_31-01-22.txt
+    # CA05
+    # python orient_sand2surface_scale.py cur_cas_05m_20201212_decvis_02.ply cur_cas_05m_20201212_decvis_02_KP_31-01-22.txt
     # note had to alter subsets.json file to have cur_cas_05m_20201212/cur_cas_05m_20201212
     # theta = 2.86, psi = -0.24
-    # CA10 cur_cas_10m_20201212_decvis_02.ply cur_cas_10m_20201210_decvis_02_SH_done.txt
-    # CA20 cur_cas_20m_20201212_decvis_02.ply cur_cas_20m_20201212_decvis_02_SH_03-05-22.txt
-    # SQ12 cur_seb_10m_20201210_decvis_02_SH_updated.txt
-    # SQ20 cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
+    # CA10
+    # python orient_sand2surface_scale.py cur_cas_10m_20201212_decvis_02.ply cur_cas_10m_20201210_decvis_02_SH_done.txt
+    # CA20
+    # python orient_sand2surface_scale.py cur_cas_20m_20201212_decvis_02.ply cur_cas_20m_20201212_decvis_02_SH_26-05-22.txt
+    # SQ12
+    # python orient_sand2surface_scale.py cur_seb_10m_20201210_decvis_02.ply cur_seb_10m_20201210_decvis_02_SH_updated.txt
+    # SQ20
+    # python orient_sand2surface_scale.py cur_seb_20m_20201210_decvis_02.ply cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
 
     # TODO: check, 0 ranges from _left and _right WP05
     # TODO: KP0160_AC_SQ12 does not have a two longest edge points! Need to find other point
+    # TODO: KP1161_AC_CA20 does not have _left
+    # TODO: fix script so that when _X, the range = 0

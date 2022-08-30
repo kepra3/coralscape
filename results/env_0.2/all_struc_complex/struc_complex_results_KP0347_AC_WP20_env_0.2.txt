@@ -1,0 +1,2 @@
+plot_name	sample_name	colony_points	colony_elevation	ground_elevation	colony_rugosity	overhang_prop	outcrop_prop	environment_rugosity	colony_range	environment_range
+WP20	KP0347_AC_WP20	5398	51.61625521780258	117.8696928091324	1.0322692929725632	0.02218528908922023	0.5735443093758036	1.8903838817934269	0.12501959775651758	0.2

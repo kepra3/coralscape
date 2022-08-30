@@ -1,0 +1,2 @@
+plot_name	sample_name	colony_points	colony_elevation	ground_elevation	colony_rugosity	overhang_prop	outcrop_prop	environment_rugosity	colony_range	environment_range
+WP05	KP0979_HU_WP05	140	38.132841846500455	33.96834558279521	1.102909939751192	0.0	0.5916430779969827	1.3658926067584711	0.014101383775160202	0.2
