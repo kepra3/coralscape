@@ -1,0 +1,2 @@
+plot_name	sample_name	colony_points	colony_elevation	ground_elevation	colony_rugosity	overhang_prop	outcrop_prop	environment_rugosity	colony_range	environment_range
+CA20	KP1088_AC_CA20	21820	33.66129726308043	100.92320948459096	1.4334644690031133	0.03859824884929594	0.5914028606484519	2.510012468292067	0.1582257412767297	0.2

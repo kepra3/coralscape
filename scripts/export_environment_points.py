@@ -69,12 +69,13 @@ def main(ply_filename, annotations_filename, environment_distance, path):
         colony_env = environment[name]
         print(colony_env)
         print(type(colony_env))
-        o3d.io.write_point_cloud('/Volumes/KP3/coralscape/environment_points/{}_env.ply'.format(name), colony_env)  # should save normals & rgb
+        o3d.io.write_point_cloud('{}/environment_points/{}_env_{}.ply'.format(path, name, environment_distance),
+                                 colony_env)  # should save normals & rgb
 
 
 if __name__ == '__main__':
     # Arguments
-    parser = argparse.ArgumentParser(prog="Colony clean and measure")
+    parser = argparse.ArgumentParser(prog="Export environment points")
     parser.add_argument('ply_filename')
     parser.add_argument('annotations_filename')
     parser.add_argument('environment_distance', type=float)
@@ -83,12 +84,12 @@ if __name__ == '__main__':
     ply_filename = args.ply_filename
     annotations_filename = args.annotations_filename
     environment_distance = args.environment_distance
-    path = "/Volumes/KP3/coralscape"
+    path = "../data"
 
     # e.g.,
     # args.ply_filename = "cur_cas_05m_20201212_rotated_scaled.ply"
     # args.annotations_filename = "scaled_annotations_cur_cas_05m_20201212.csv"
-    # args.environment_distance = 0.1
+    # args.environment_distance = 0.2
 
     # PLOTS & ROTATIONS:
     # CA05 cur_cas_05m_20201212_rotated_scaled.ply

@@ -1,0 +1,2 @@
+plot_name	sample_name	colony_points	colony_elevation	ground_elevation	colony_rugosity	overhang_prop	outcrop_prop	environment_rugosity	colony_range	environment_range
+SB20	KP0690_AC_SB20	22816	125.30554006874205	30.884630820243387	1.5077490729080352	0.061618708315746784	0.5327803491962907	2.779692618262537	0.1842313371140225	0.2

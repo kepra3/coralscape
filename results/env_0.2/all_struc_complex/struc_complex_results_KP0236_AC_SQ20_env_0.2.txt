@@ -1,0 +1,2 @@
+plot_name	sample_name	colony_points	colony_elevation	ground_elevation	colony_rugosity	overhang_prop	outcrop_prop	environment_rugosity	colony_range	environment_range
+SQ20	KP0236_AC_SQ20	2372	64.90229466960932	50.199881145413684	1.8103458532086285	0.0	0.4892567775256755	2.227917185817961	0.06188531838519118	0.2

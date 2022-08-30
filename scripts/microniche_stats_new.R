@@ -24,6 +24,16 @@ combine_metadata <- function(struc.complex, clusters, coordinates) {
   metadata <- cbind(sorted.clusters.subset, sorted.struc.complex.subset[,3:10], sorted.coordinates.subset[,-1])
   return(metadata)
 }
+fix_angles <- function(angles){
+  angles_new <- angles
+  for (i in 1:length(angles)) {
+    if (angles[i] > 90) {
+      angles_new[i] <- 180 - angles[i]
+    } else {
+      angles_new[i] <- angles[i]
+    }
+  }
+  return(angles_new)}
 k_boxplot <- function(df, categorical, continuous, lab, colours, facet="No") {
   categorical <- droplevels(categorical)
   present_clusters <- levels(categorical)
@@ -162,14 +172,9 @@ metadata[, c(2:4, 9)] <- data.frame(lapply(metadata[, c(2:4, 9)], as.factor))
 str(metadata)
 metadata$colony_rugosity_sqrt <- sqrt(metadata$colony_rugosity)
 metadata$environment_rugosity_sqrt <- sqrt(metadata$environment_rugosity)
-metadata$colony_elevation_corr <- NA
-for (i in 1:length(metadata$colony_elevation)) {
-  if (metadata$colony_elevation[i] > 90) {
-    metadata$colony_elevation_corr[i] <- 180 - metadata$colony_elevation[i]
-  } else {
-    metadata$colony_elevation_corr[i] <- metadata$colony_elevation[i]
-    }
-}
+metadata$colony_elevation_corr <- fix_angles(metadata$colony_elevation)
+metadata$ground_elevation_corr <- fix_angles(metadata$ground_elevation)
+
 metadata$overhang_prop_2 <- NA
 for (i in 1:length(metadata$overhang_prop)) {
   if (metadata$overhang_prop[i] > 1) {
@@ -178,23 +183,23 @@ for (i in 1:length(metadata$overhang_prop)) {
     metadata$overhang_prop_2[i] <- metadata$overhang_prop[i]
   }
 }
-
-area_results <- read.delim("~/git/coralscape/results/area_results.txt")
+# AREA RESULTS DON'T MATCH 25/5/22 ####
+#area_results <- read.delim("~/git/coralscape/results/area_results.txt")
 #area_results_WP20 <- read.delim("~/git/coralscape/results/results_WP20/area_results_WP20.txt")
 #area_results <- rbind(area_results, area_results_WP20)
-area_results_sub <-  subset(area_results, sample_name %in% metadata$Individual)
-area_results_sort <-  area_results_sub[order(area_results_sub[,2]),]
-identical(area_results_sort[,2], metadata[,1])
-metadata$area <- area_results_sort$colony_threeD_area
-metadata$area_sqrt <- sqrt(metadata$area)
-rm(area_results)
-rm(area_results_sort)
-rm(area_results_sub)
+#area_results_sub <-  subset(area_results, sample_name %in% metadata$Individual)
+#area_results_sort <-  area_results_sub[order(area_results_sub[,2]),]
+#identical(area_results_sort[,2], metadata[,1])
+#metadata$area <- area_results_sort$colony_threeD_area
+#metadata$area_sqrt <- sqrt(metadata$area)
+#rm(area_results)
+#rm(area_results_sort)
+#rm(area_results_sub)
 
 write_csv(metadata, file = "~/Dropbox/agaricia_project_2019/shalo_ag/gen_project/3 - Spatial/metadata_X.csv")
 # List of samples to remove due to issues ####
 # See sample_investigation.xcls
-env <- metadata[, c(18,24,26,27,28,30)]
+env <- metadata[, c(18,24,26,27,28)]
 env_x <- env
 env_x$Clusters <- metadata$Clusters
 env_x$Individual <- metadata$Individual
@@ -233,6 +238,11 @@ k_boxplot(metadata, metadata$Clusters, metadata$environment_rugosity_sqrt, "Squa
 k_boxplot(metadata, metadata$Clusters, metadata$colony_elevation_corr, "Colony Elevation corr", colours)
 k_boxplot(metadata, metadata$Clusters, metadata$colony_elevation_corr, "Colony Elevation corr", colours, facet = "All")
 k_boxplot(metadata, metadata$Clusters, metadata$colony_elevation_corr, "Colony Elevation corr", colours, facet = "Depth")
+
+k_boxplot(metadata, metadata$Clusters, metadata$ground_elevation_corr, "Ground Elevation corr", colours)
+k_boxplot(metadata, metadata$Clusters, metadata$ground_elevation_corr, "Ground Elevation corr", colours, facet = "All")
+k_boxplot(metadata, metadata$Clusters, metadata$ground_elevation_corr, "Ground Elevation corr", colours, facet = "Depth")
+
 k_boxplot(metadata, metadata$Clusters, metadata$colony_rugosity_sqrt, "Square-root of Colony Rugosity", colours)
 k_boxplot(metadata, metadata$Clusters, metadata$colony_rugosity_sqrt, "Square-root of Colony Rugosity", colours, facet = "All")
 k_boxplot(metadata, metadata$Clusters, metadata$colony_rugosity_sqrt, "Square-root of Colony Rugosity", colours, facet = "Depth")
@@ -241,6 +251,7 @@ k_boxplot(metadata, metadata$Clusters, metadata$colony_rugosity, "Colony Rugosit
 k_boxplot(metadata, metadata$Clusters, metadata$overhang_prop_2, "Overhang proportion", colours)
 k_boxplot(metadata, metadata$Clusters, metadata$overhang_prop_2, "Overhang proportion", colours, facet = "All")
 k_boxplot(metadata, metadata$Clusters, metadata$overhang_prop_2, "Overhang proportion", colours, facet = "Depth")
+
 k_boxplot(metadata, metadata$Clusters, metadata$outcrop_prop, "Outcrop proportion", colours)
 k_boxplot(metadata, metadata$Clusters, metadata$outcrop_prop, "Outcrop proportion", colours, facet = "All")
 k_boxplot(metadata, metadata$Clusters, metadata$outcrop_prop, "Outcrop proportion", colours, facet = "Depth")
@@ -250,35 +261,35 @@ ggplot(metadata, aes(colony_rugosity, colony_elevation_corr, colour = Clusters))
   geom_point() + theme_classic()
   
 param_list = c('colony_rugosity_sqrt', 'environment_rugosity_sqrt', 'colony_elevation_corr', 'outcrop_prop', 'overhang_prop_2', 'area_sqrt')
-site_list = c('SB05', 'SB10', 'SB20', 'WP05', 'WP10', 'WP20') # , "CA05"
+site_list = c('SB05', 'SB10', 'SB20', 'WP05', 'WP10', 'WP20', "CA05")
 depth_list = c('20', '10', '5')
 
 for (i in param_list) {
   print("Starting new parameter loop")
   p <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours)
   print(p)
-  ggsave(paste0("plots/", i, ".png"), p)
+  ggsave(paste0("plots/", i, ".pdf"), p)
   p1 <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours, facet = "All")
   print(p1)
-  ggsave(paste0("plots/", i, "_facet.png"), p1, height = 30, width = 20, units = "cm")
+  ggsave(paste0("plots/", i, "_facet.pdf"), p1, height = 30, width = 20, units = "cm")
   print("Starting site loop")
   pd <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours, facet = "Depth")
   print(pd)
-  ggsave(paste0("plots/", i, "_depth.png"), pd, height = 15, width = 20, units = "cm")
+  ggsave(paste0("plots/", i, "_depth.pdf"), pd, height = 15, width = 20, units = "cm")
   pl <- k_boxplot(metadata, metadata$Clusters, metadata[,i], i, colours, facet = "Loc")
   print(pl)
-  ggsave(paste0("plots/", i, "_loc.png"), pl, height = 15, width = 20, units = "cm")
+  ggsave(paste0("plots/", i, "_loc.pdf"), pl, height = 15, width = 20, units = "cm")
   for (j in site_list) {
     site <- metadata[metadata$Site == j,]
     p2 <- k_boxplot(site, site$Clusters, site[,i], paste(i, j), colours)
     print(p2)
-    ggsave(paste0("plots/", i, "_", j, ".png"), p2)}
+    ggsave(paste0("plots/", i, "_", j, ".pdf"), p2)}
   print("Starting depth loop")
   for (k in depth_list) {
       depth <- metadata[metadata$Depth == k,]
       p3 <- k_boxplot(depth, depth$Clusters, depth[,i], paste(i, k), colours)
       print(p3)
-      ggsave(paste0("plots/", i, "_", k, ".png"), p3)}
+      ggsave(paste0("plots/", i, "_", k, ".pdf"), p3)}
   }
 
 # Proportion of colonies ###
@@ -452,7 +463,7 @@ ggplot(metadata, aes(area_sqrt, colony_elevation, colour = Clusters)) +
   facet_wrap(~ Depth + Loc) +
   geom_smooth(method = "lm", se = T, alpha = 0.15)
 
-# Statistics ####
+# *** Statistics *** ####
 
 # Checking normality
 shapiro.test(metadata$colony_elevation) # not-normal
@@ -469,37 +480,33 @@ shapiro.test(metadata$overhang_prop) # not normal, from 0 to 1, zero-inflated
 #}
 
 # Elevation ####
-lm.colony_elevation <- lm(colony_elevation ~ Clusters, data = metadata)
+lm.colony_elevation <- lm(colony_elevation_corr ~ Clusters, data = metadata)
 summary(lm.colony_elevation)
 TukeyHSD(aov(lm.colony_elevation))
 
-lmer.colony_elevation <- lmer(colony_elevation ~ Clusters + (1|Loc), data = metadata)
+lmer.colony_elevation <- lmer(colony_elevation_corr ~ Clusters + (1|Loc), data = metadata)
 summary(lmer.colony_elevation)
 emmeans(lmer.colony_elevation, list(pairwise ~ Clusters), adjust = "tukey")
 
-lmer.colony_elevation.depth <- lmer(colony_elevation ~ Depth + (1|Loc), data = metadata)
+lmer.colony_elevation.depth <- lmer(colony_elevation_corr ~ Depth + (1|Loc), data = metadata)
 summary(lmer.colony_elevation.depth)
 emmeans(lmer.colony_elevation.depth, list(pairwise ~ Depth), adjust = "tukey") # No differences between depths?
-emmeans(lmer3.colony_elevation, list(pairwise ~ Clusters), adjust = "tukey") # No interactions
 
-lmer2.colony_elevation <- lmer(colony_elevation ~ Clusters*Depth + (1|Loc), data = metadata)
+lmer2.colony_elevation <- lmer(colony_elevation_corr ~ Clusters*Depth + (1|Loc), data = metadata)
 summary(lmer2.colony_elevation)
 emmeans(lmer2.colony_elevation, list(pairwise ~ Clusters:Depth), adjust = "tukey") # No interactions
 
-lmer3.colony_elevation <- lmer(colony_elevation ~ Clusters + (1|Loc/Depth), data = metadata)
+lmer3.colony_elevation <- lmer(colony_elevation_corr ~ Clusters + (1|Loc/Depth), data = metadata)
 summary(lmer3.colony_elevation)
 emmeans(lmer3.colony_elevation, list(pairwise ~ Clusters), adjust = "tukey")
-# AL1 - AL2    38.19 12.17 225.9  3.137  0.0313 
-# AA1 - AA2    28.95 12.07 225.2  2.397  0.2046 
-# AA1 - AL2    33.43  8.04 226.3  4.157  0.0009
 
-lmer4.colony_elevation <- lmer(colony_elevation ~ Clusters + (Clusters|Loc/Depth), data = metadata)
+lmer4.colony_elevation <- lmer(colony_elevation_corr ~ Clusters + (Clusters|Loc/Depth), data = metadata)
 summary(lmer4.colony_elevation)
 # NaNs issues...
 
 # tests with difference variance...
-kruskal.test(metadata$colony_elevation, metadata$Clusters)
-boxplot(metadata$colony_elevation ~ metadata$Clusters)
+kruskal.test(metadata$colony_elevation_corr, metadata$Clusters)
+boxplot(metadata$colony_elevation_corr ~ metadata$Clusters)
 library(FSA)
 dunnTest(metadata$colony_elevation ~ metadata$Clusters, 
          method = 'bonferroni')
@@ -558,6 +565,7 @@ TukeyHSD(aov(lm.outcrop.depth))
 lmer.outcrop_prop <- lmer(outcrop_prop ~ Clusters*Depth + (1|Loc), data = metadata)
 summary(lmer.outcrop_prop)
 emmeans(lmer.outcrop_prop, list(pairwise ~ Clusters:Depth), adjust = "tukey")
+#AA2 Depth10 - AA2 Depth20 -0.05981 0.0161 348.6  -3.705  0.0352
 
 lm.outcrop_prop.depth <- lm(outcrop_prop ~ Clusters*Depth, data = metadata)
 summary(lm.outcrop_prop.depth)
