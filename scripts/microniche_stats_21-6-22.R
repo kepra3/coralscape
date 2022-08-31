@@ -11,6 +11,7 @@ library(vegan)
 library(MASS)
 library(FSA)
 library(viridis)
+library(report)
 
 # Functions
 combine_metadata <- function(struc.complex, taxa, coordinates) {

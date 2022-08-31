@@ -149,7 +149,7 @@ def calc_plane_angles(plane_model):
     return theta.__float__(), psi.__float__(), elevation.__float__()
 
 
-def main(ply_filename, annotations_filename, subsets_filename, path, KDTree='No'):
+def main(ply_filename, annotations_filename, subsets_filename, path):
     """ Write description here """
 
     short_name = "_".join(ply_filename.split('_')[0:4])
@@ -202,14 +202,6 @@ def main(ply_filename, annotations_filename, subsets_filename, path, KDTree='No'
     annotation_df.to_csv('../data/rotated_scaled_annotations_{}.csv'.format(short_name))
     print('Export ply file')
     o3d.io.write_point_cloud('../data/{}_rotated_scaled_dec50M.ply'.format(short_name), pcd_r)
-    if KDTree == 'Yes':
-        print('Building KDTree ...')
-        pcd_tree_r = o3d.geometry.KDTreeFlann(pcd_r)
-        # Save KDTree
-        with open('../data/{}_KDTree.pkl'.format(short_name), "wb") as kdtree_file:
-            pickle.dump(pcd_tree_r, kdtree_file)
-    else:
-        'Not building KDTree'
 
 
 if __name__ == '__main__':
@@ -217,7 +209,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog="Rotate ply and annotations")
     parser.add_argument('ply_filename', help='Filename of PLY file')
     parser.add_argument('annotations_filename', help='Filename of annotations file')
-    parser.add_argument('KDTree', help='Whether you want to build and export a KDTree or not')
     args = parser.parse_args()
 
     ply_filename = args.ply_filename
@@ -233,13 +224,11 @@ if __name__ == '__main__':
     # Directory where original ply is!
     path = "/mnt/coral3d/focal_plots/{}/{}/{}".format(dir1, dir2, ply_filename)
 
-    KDTree = args.KDTree
     # e.g.,
     # args.ply_filename = "cur_kal_20m_20200214"
     # args.annotations_filename = "cur_kal_20m_20200214_decvis_02_KP_16-12-21_completed.txt"
     # args.subsets_filename = "cur_kal_20m_20200214_subsets.json"
     # args.site = "WP20"
-    # args.KDTree = "No"
 
     # PLOTS & ROTATIONS:
     # WP05 cur_kal_05m_20200214_decvis_02_KP.txt
@@ -274,4 +263,4 @@ if __name__ == '__main__':
     # Theta is ... 29.32225489795626
     # Psi is ... -0.6445221821626353
 
-    main(ply_filename, annotations_filename, subsets_filename, path, KDTree)
+    main(ply_filename, annotations_filename, subsets_filename, path)
