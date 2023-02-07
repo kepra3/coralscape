@@ -1,17 +1,17 @@
 colony_point_clouds/colony_test_pics
-colony_point_clouds/colony_test_pics/*
+colony_point_clouds/colony_test_pics/
 results/dispersal_paper_results
-results/dispersal_paper_results/*
+results/dispersal_paper_results/
 results/microhabitat_paper_results
-results/microhabitat_paper_results/*
+results/microhabitat_paper_results/
 results/scrap_results
-results/scrap_results/*
+results/scrap_results/
 scrap
-scrap/*
+scrap/
 scripts/microhabitat_paper_scripts
-scripts/microhabitat_paper_scripts/*
+scripts/microhabitat_paper_scripts/
 testing_scripts
-testing_scripts/*
+testing_scripts/
 
 
 
