@@ -3,6 +3,9 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/colony_point_clouds/colony_test_pics" />
+      <excludeFolder url="file://$MODULE_DIR$/results/scrap_results" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/testing_scripts" />
+      <excludeFolder url="file://$MODULE_DIR$/scrap" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (open3d)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
