@@ -172,6 +172,18 @@ for  (i in site_list) {
   
 }
 
+# Separate by Depths ####
+metadata20 <- metadata[metadata$Depth == "20",]
+metadata10 <- metadata[metadata$Depth == "10-12" &
+                         (metadata$Taxa == "AA2" |
+                            metadata$Taxa == "AH1" |
+                            metadata$Taxa == "AH3" |
+                            metadata$Taxa == "AL2"),]
+metadata5 <- metadata[metadata$Depth == "5",]
+
+
+#### ********************** STOP HERE IF WANT TO SKIP TO ANOTHER SECTION ************************** ####
+
 # Proportion of Taxa by Depth ####
 library(corrplot)
 tab <- table(metadata$Taxa, metadata$Depth)
@@ -240,14 +252,6 @@ ggplot(data = x, aes(Var1, 1, fill = Var1)) + geom_point(size = x$bin, shape = 2
 #ggsave("depth_distribution.pdf", height = 4, width = 17, units = "cm")
 
 
-# Separate by Depths ####
-metadata20 <- metadata[metadata$Depth == "20",]
-metadata10 <- metadata[metadata$Depth == "10-12" &
-                         (metadata$Taxa == "AA2" |
-                          metadata$Taxa == "AH1" |
-                          metadata$Taxa == "AH3" |
-                          metadata$Taxa == "AL2"),]
-metadata5 <- metadata[metadata$Depth == "5",]
 
 
 
@@ -604,7 +608,7 @@ scatter(dapc_AA, legend = TRUE, col = colours[1:2])
 AA_all_data <- metadata[metadata$Taxa == "AA1" | metadata$Taxa == "AA2",]
 AA_all_data[AA_all_data$Taxa == "AA1" & AA_all_data$Depth == "10-12",] <- NA
 AA_all_data <- na.omit(AA_all_data)
-AA_all_data$TaxDep <- paste0(AA_all_data$Taxa, ".", AA_all_data$Depth)
+AA_all_data$TaxDep <- paste0(AA_all_data$Taxa, "..", AA_all_data$Depth)
 AA_all_data$TaxDep <- as.factor(AA_all_data$TaxDep) 
 dapc_all_AA <- dapc.data.frame(AA_all_data[, c(12, 19:22)],
                                grp = AA_all_data$TaxDep, scale = TRUE)

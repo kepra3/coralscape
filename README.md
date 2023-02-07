@@ -2,8 +2,6 @@
 
 Custom scripts for measuring coral reef microhabitat structural complexity on 3D point cloud data (structure-from-motion photogrammetry) using open3D and numpy packages in python.
 
-Statistical using linear regresions with univariate and multivariate data conducted in R.
-
 ## Running analyses
 
 1. Rotate point cloud and annotations according to the 'up vector'
@@ -24,3 +22,7 @@ $ export_environment_points.py [ply filname] [annotations filename] [json file] 
 ```bash
 $ python get_measures.py [environment points ply filename] [annotations filename]
 ```
+
+## HPC workflow
+
+I prefer to use the software `parallel` for parallel computation.

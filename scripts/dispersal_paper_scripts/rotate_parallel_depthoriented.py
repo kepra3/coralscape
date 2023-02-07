@@ -11,7 +11,7 @@
 import numpy as np
 import pandas as pd
 
-PATH = '/Users/kprata/git/coralscape/results'
+PATH = '/results'
 
 # TODO: note doing for coordinates with X!
 
