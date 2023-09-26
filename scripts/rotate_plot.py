@@ -262,8 +262,8 @@ if __name__ == '__main__':
     # Theta is ... -32.03105065955869
     # Psi is ... -6.77682359250437
     # SQ12 cur_seb_10m_20201210_decvis_02.ply cur_seb_10m_20201210_decvis_02_SH_updated.txt
-    #Theta is ... -11.644224255407794
-    #Psi is ... 2.8498421712287363
+    # Theta is ... -11.644224255407794
+    # Psi is ... 2.8498421712287363
     # SQ20 cur_seb_20m_20201210_decvis_02.ply cur_seb_20m_20201210_decvis_02_SH_10-02-2022.txt
     # Theta is ... 29.32225489795626
     # Psi is ... -0.6445221821626353

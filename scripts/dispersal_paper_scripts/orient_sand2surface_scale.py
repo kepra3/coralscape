@@ -5,7 +5,7 @@
 """
 @author: kprata
 @date created: 3/5/22
-@description: TODO
+@description: Orient plot to the XY-axis plane.
 """
 
 import argparse

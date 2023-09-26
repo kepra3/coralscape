@@ -6,6 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/results/scrap_results" />
       <excludeFolder url="file://$MODULE_DIR$/scripts/testing_scripts" />
       <excludeFolder url="file://$MODULE_DIR$/scrap" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/microhabitat_paper_scripts/old" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (open3d)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

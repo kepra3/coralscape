@@ -359,7 +359,7 @@ def main(ply_filename, annotations_filename, path):
         # Because of the right handed system y_n will be to the left of x_n and the right of z_n
         # And orthogonal to both
         y_n = np.cross(z_n, x_n)
-        # This creates a new coordinate system will the z_n normal to the x-y plane
+        # This creates a new coordinate system with the z_n normal to the x-y plane
         R = np.array([x_n, y_n, z_n])
         with open(detailed_results, 'a') as results_out:
             results_out.write("\t{0}\t{1}\t{2}"

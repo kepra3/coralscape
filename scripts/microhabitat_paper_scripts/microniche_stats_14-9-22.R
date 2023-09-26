@@ -1,6 +1,7 @@
 # Title: Assessing differentiation of microhabitat by taxa using linear models
 # Author: Katharine Prata
 # Date: 21/6/22
+# Last edit: 18/4/23
 
 # Packages ####
 library(tidyverse)
@@ -107,9 +108,32 @@ overdisp_fun <- function(model) {
   pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
   c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
 }
+mds_plot <- function(dat, cent, taxa.colours, ef.data) {
+  plot <- ggplot() +
+    geom_point(data = dat, aes(x = MDS1, y = MDS2, fill = Taxa, shape = Taxa), size = 1.5, alpha = 0.5) +
+    geom_point(data = cent, aes(NMDS1, NMDS2, fill = Taxa, shape = Taxa), size = 3) +
+    geom_point(data = cent, aes(NMDS1, NMDS2), size = 3, shape = 8, colour = "black") +
+    scale_fill_manual(values = taxa.colours, name = "Taxa") +
+    scale_shape_manual(values = c(22, 24), name = "Taxa") +
+    #coord_fixed() + ## need aspect ratio of 1
+    ylim(c(-4.5, 4.5)) +
+    xlim(c(-4.5, 4.5)) +
+    #ggtitle(paste("Stress: ", round(nmds$stress, digits = 3))) +
+    theme_minimal() +
+    geom_segment(data = ef.data, aes(x = 0, xend = NMDS1, y = 0, yend = NMDS2),
+                 arrow = arrow(length = unit (0.25, "cm")), color = "blue") +
+    geom_text(data = ef.data, aes(x = NMDS1, y = NMDS2, label = row.names(ef.data)),
+              colour = "blue", size = 3) +
+    theme(legend.position = "none",
+          text = element_text(size = 8),
+          panel.border = element_rect(colour = "black", fill = NA),
+          axis.ticks = element_line(),
+          axis.text = element_text(size = 8))
+  return(plot)
+}
 
 # Import datasets
-setwd("~/git/coralscape/results/")
+setwd("~/git/coralscape/results/microhabitat_paper_results/")
 #struc.complex <- read.csv("env_0.2/all_struc_complex.txt", sep = "\t")
 #struc.complex <- struc.complex[struc.complex$plot_name != "plot_name",]
 #taxa <- read.csv("taxa_metadata.csv")
@@ -602,38 +626,20 @@ AA_adonis <- adonis2(formula = AA_env_dist_mat ~ AA_data$Taxa, permutations = 99
 AA_adonis
 names(AA_adonis)
 
-
 # Plot
-nmds <- metaMDS(comm = env, distance = "euclidean", k = 3)
+nmds <- metaMDS(comm = env, distance = "euclidean", k = 2)
 ef <- envfit(nmds, env, permu = 999, strata = AA_data$Loc)
-
 ef.data <- as.data.frame(scores(ef, display = "vectors"))
+row.names(ef.data) <- c("outcrop", "rugosity", "elevation", "overhang", "z")
 dat <- data.frame(nmds$points)
 dat$Taxa <- AA_data$Taxa
 # Calculate centroids
 scores <- scores(nmds, display = "sites")
 cent <- aggregate(scores ~ Taxa, data = dat, FUN = "mean")
-ggplot() +
-  geom_point(data = dat, aes(x = MDS1, y = MDS2,
-                                     fill = Taxa), size = 2, shape = 21, alpha = 0.5) +
-  scale_fill_manual(values = colours[1:2],
-                     name = "Taxa") +
-  geom_point(data = cent, aes(NMDS1, NMDS2, fill = Taxa), size = 4, shape = 21) +
-  geom_point(data = cent, aes(NMDS1, NMDS2), size = 4, shape = 8, colour = "black") +
-  ylim(c(-4, 4)) +
-  xlim(c(-4, 4)) +
-  #coord_fixed() + ## need aspect ratio of 1
-  ggtitle(paste("Stress: ", round(nmds$stress, digits = 3))) +
-  theme_minimal() +
-  geom_segment(data = ef.data, aes(x = 0, xend = NMDS1, y = 0, yend = NMDS2),
-               arrow = arrow(length = unit (0.25, "cm")), color = "blue") +
-  geom_text(data = ef.data,
-            aes(x = NMDS1, y = NMDS2, label = row.names(ef.data)), colour = "blue",
-            size = 4) +
-  theme(legend.position = "right",
-        text = element_text(size = 8),
-        title = element_text(size = 10))
-ggsave("NMDS_Agaricites.pdf", height = 10, width = 12, units = "cm")
+# Make plot
+ac.mds <- mds_plot(dat, cent, colours[1:2], ef.data)
+ac.mds
+ggsave(plot = ac.mds, "NMDS_Agaricites.pdf", height = 8, width = 8, units = "cm")
 
 ## humilis ####
 AH_data <- metadata5[metadata5$Taxa == "AH1" | metadata5$Taxa == "AH2" | metadata5$Taxa == "AH3",]
@@ -697,34 +703,19 @@ AL_adonis <- adonis2(formula = AL_env_dist_mat ~ AL_data$Taxa,
 AL_adonis
 # the adonis test are identical to the annova.cca of dbrda
 # permutational MANOVA
-nmds <- metaMDS(env, k=3, distance = "euclidean") # K maybe needs to be 3
+nmds <- metaMDS(env, k=2, distance = "euclidean") # K maybe needs to be 3
 ef <- envfit(nmds, env, permu = 999, strata = AL_data$Loc)
 
 ef.data <- as.data.frame(scores(ef, display = "vectors"))
+row.names(ef.data) <- c("outcrop", "rugosity", "elevation", "overhang", "z")
 dat <- data.frame(nmds$points)
 dat$Taxa <- AL_data$Taxa
 # Calculate centroids
 scores <- scores(nmds, display = "sites")
 cent <- aggregate(scores ~ Taxa, data = dat, FUN = "mean")
-ggplot() +
-  geom_point(data = dat, aes(x = MDS1, y = MDS2,
-                             fill = Taxa), size = 2, shape = 21, alpha = 0.5) +
-  scale_fill_manual(values = colours[6:7],
-                    name = "Taxa") +
-  geom_point(data = cent, aes(NMDS1, NMDS2, fill = Taxa), size = 4, shape = 21) +
-  geom_point(data = cent, aes(NMDS1, NMDS2), size = 4, shape = 8, colour = "black") +
-  #coord_fixed() + ## need aspect ratio of 1
-  ylim(c(-4, 4)) +
-  xlim(c(-4, 4)) +
-  ggtitle(paste("Stress: ", round(nmds$stress, digits = 3))) +
-  theme_minimal() +
-  geom_segment(data = ef.data, aes(x = 0, xend = NMDS1, y = 0, yend = NMDS2),
-               arrow = arrow(length = unit (0.25, "cm")), color = "blue") +
-  geom_text(data = ef.data,
-            aes(x = NMDS1, y = NMDS2, label = row.names(ef.data)), colour = "blue",
-            size = 4) +
-  theme(legend.position = "right",
-        text = element_text(size = 8),
-        title = element_text(size = 10))
-ggsave("NMDS_Lamarcki.pdf", height = 10, width = 12, units = "cm")
+
+lm.mds <- mds_plot(dat, cent, colours[6:7], ef.data)
+lm.mds
+# Plot
+ggsave(plot = lm.mds, "NMDS_Lamarcki.pdf", height = 8, width = 8, units = "cm")
 
